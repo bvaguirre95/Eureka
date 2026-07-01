@@ -1,0 +1,448 @@
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from slugify import slugify
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from app.models.inspection import (
+    ActionStatusEnum, CorrectiveAction, FieldTypeEnum,
+    Inspection, InspectionFieldValue, InspectionRecord,
+    InspectionStatusEnum, InspectionType, InspectionTypeField,
+)
+from app.schemas.inspection import (
+    CorrectiveActionCreate, CorrectiveActionOut, CorrectiveActionUpdate,
+    FieldValueOut, InspectionCreate, InspectionDashboard,
+    InspectionListItem, InspectionOut, InspectionRecordOut,
+    InspectionTypeCreate, InspectionTypeOut,
+    InspectionTypeStat, InspectionTypeFieldOut, InspectionUpdate,
+)
+from app.models.company import CompanySigners
+from app.models.user import User
+# ── Loaders ───────────────────────────────────────────────────────────────────
+
+def _load_type(db, type_id):
+    stmt = (select(InspectionType)
+            .options(selectinload(InspectionType.fields))
+            .where(InspectionType.id == type_id))
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def _load_inspection(db, inspection_id):
+    stmt = (
+        select(Inspection)
+        .options(
+            selectinload(Inspection.inspection_type).selectinload(InspectionType.fields),
+            selectinload(Inspection.records).selectinload(InspectionRecord.values)
+                .selectinload(InspectionFieldValue.field),
+            selectinload(Inspection.actions).selectinload(CorrectiveAction.responsible),
+            selectinload(Inspection.assigned_to),
+            selectinload(Inspection.created_by),
+        )
+        .where(Inspection.id == inspection_id)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
+
+def _stats(insp: Inspection) -> dict:
+    total = len(insp.records)
+    findings = sum(1 for r in insp.records if r.has_finding)
+    open_act = sum(1 for a in insp.actions
+                   if a.status in (ActionStatusEnum.PENDIENTE, ActionStatusEnum.EN_PROGRESO))
+    pct = round(((total - findings) / total * 100), 1) if total > 0 else 0.0
+    return dict(total_records=total, records_with_findings=findings,
+                open_actions=open_act, compliance_percent=pct)
+
+
+def _to_record_out(record: InspectionRecord) -> InspectionRecordOut:
+    values_out = [
+        FieldValueOut(
+            field_id=v.field_id,
+            field_key=v.field.field_key if v.field else "",
+            field_name=v.field.name if v.field else "",
+            field_type=v.field.field_type if v.field else "",
+            value=v.value,
+        )
+        for v in sorted(record.values, key=lambda x: x.field.order if x.field else 0)
+    ]
+    return InspectionRecordOut(
+        id=record.id, order=record.order,
+        has_finding=record.has_finding,
+        photo_path=record.photo_path,
+        has_photo=bool(record.photo_path),
+        values=values_out,
+    )
+
+
+def _to_action_out(a: CorrectiveAction) -> CorrectiveActionOut:
+    return CorrectiveActionOut(
+        id=a.id, inspection_id=a.inspection_id, record_id=a.record_id,
+        item_ref=a.item_ref, description=a.description, action=a.action,
+        priority=a.priority, due_date_start=a.due_date_start,
+        due_date_end=a.due_date_end, status=a.status,
+        completion_notes=a.completion_notes, completed_at=a.completed_at,
+        responsible_id=a.responsible_id,
+        responsible_name=a.responsible.full_name if a.responsible else None,
+        created_at=a.created_at,
+    )
+
+
+def _to_inspection_out(insp: Inspection) -> InspectionOut:
+    st = _stats(insp)
+    fields_out = [InspectionTypeFieldOut.model_validate(f)
+                  for f in insp.inspection_type.fields]
+    return InspectionOut(
+        id=insp.id, company_id=insp.company_id,
+        inspection_type_id=insp.inspection_type_id,
+        inspection_type_name=insp.inspection_type.name,
+        inspection_type_fields=fields_out,
+        status=insp.status,
+        inspection_number=insp.inspection_number,
+        scheduled_date=insp.scheduled_date,
+        completed_date=insp.completed_date,
+        location=insp.location, start_time=insp.start_time, end_time=insp.end_time,
+        general_observations=insp.general_observations,
+        recommendations=insp.recommendations,
+        elaborated_by=insp.elaborated_by, elaborated_role=insp.elaborated_role,
+        reviewed_by=insp.reviewed_by, reviewed_role=insp.reviewed_role,
+        approved_by=insp.approved_by, approved_role=insp.approved_role,
+        assigned_to_id=insp.assigned_to_id,
+        assigned_to_name=insp.assigned_to.full_name if insp.assigned_to else None,
+        created_by_name=insp.created_by.full_name if insp.created_by else None,
+        records=[_to_record_out(r) for r in insp.records],
+        actions=[_to_action_out(a) for a in insp.actions],
+        created_at=insp.created_at, **st,
+    )
+
+
+def _to_list_item(insp: Inspection) -> InspectionListItem:
+    st = _stats(insp)
+    return InspectionListItem(
+        id=insp.id, company_id=insp.company_id,
+        inspection_type_id=insp.inspection_type_id,
+        inspection_type_name=insp.inspection_type.name,
+        status=insp.status, inspection_number=insp.inspection_number,
+        scheduled_date=insp.scheduled_date, completed_date=insp.completed_date,
+        location=insp.location,
+        assigned_to_name=insp.assigned_to.full_name if insp.assigned_to else None,
+        created_at=insp.created_at, **st,
+    )
+
+
+# ── Inspection Types ──────────────────────────────────────────────────────────
+
+def get_inspection_types(db: Session, organization_id: int,
+                          only_active: bool = False) -> List[InspectionTypeOut]:
+    stmt = (select(InspectionType)
+            .options(selectinload(InspectionType.fields))
+            .where(InspectionType.organization_id == organization_id))
+    if only_active:
+        stmt = stmt.where(InspectionType.is_active.is_(True))
+    types = db.execute(stmt.order_by(InspectionType.name)).scalars().all()
+    result = []
+    for t in types:
+        out = InspectionTypeOut.model_validate(t)
+        out.field_count = len(t.fields)
+        out.inspection_count = len(t.inspections)
+        result.append(out)
+    return result
+
+
+def get_inspection_type(db: Session, type_id: int) -> Optional[InspectionType]:
+    return _load_type(db, type_id)
+
+
+def create_inspection_type(db: Session, org_id: int, user_id: int,
+                            type_in: InspectionTypeCreate) -> InspectionTypeOut:
+    itype = InspectionType(
+        organization_id=org_id, name=type_in.name,
+        description=type_in.description, icon=type_in.icon,
+        periodicity=type_in.periodicity, is_active=type_in.is_active,
+        pdf_template=getattr(type_in, "pdf_template", "generico") or "generico", nomenclatura=type_in.nomenclatura,
+        created_by_id=user_id,
+    )
+    db.add(itype)
+    db.flush()
+    for idx, f in enumerate(type_in.fields):
+        key = f.field_key or slugify(f.name, separator="_")
+        db.add(InspectionTypeField(
+            inspection_type_id=itype.id, name=f.name, field_key=key,
+            field_type=f.field_type, options=f.options,
+            is_required=f.is_required, order=f.order or idx,
+            group_name=f.group_name,
+        ))
+    db.commit()
+    t = _load_type(db, itype.id)
+    out = InspectionTypeOut.model_validate(t)
+    out.field_count = len(t.fields)
+    return out
+
+
+def update_inspection_type(db: Session, itype: InspectionType,
+                            type_in) -> InspectionTypeOut:
+    for f in ["name", "description", "icon", "periodicity", "is_active", "pdf_template","nomenclatura"]:
+        v = getattr(type_in, f, None)
+        if v is not None:
+            setattr(itype, f, v)
+    if type_in.fields is not None:
+        for old in list(itype.fields):
+            db.delete(old)
+        db.flush()
+        for idx, f in enumerate(type_in.fields):
+            key = f.field_key or slugify(f.name, separator="_")
+            db.add(InspectionTypeField(
+                inspection_type_id=itype.id, name=f.name, field_key=key,
+                field_type=f.field_type, options=f.options,
+                is_required=f.is_required, order=f.order or idx,
+                group_name=f.group_name
+            ))
+    db.commit()
+    t = _load_type(db, itype.id)
+    out = InspectionTypeOut.model_validate(t)
+    out.field_count = len(t.fields)
+    return out
+
+
+def deactivate_inspection_type(db: Session, itype: InspectionType) -> InspectionTypeOut:
+    itype.is_active = False
+    db.commit()
+    t = _load_type(db, itype.id)
+    return InspectionTypeOut.model_validate(t)
+
+
+# ── Inspections ───────────────────────────────────────────────────────────────
+
+def get_inspections_for_company(db: Session, company_id: int) -> List[InspectionListItem]:
+    stmt = (
+        select(Inspection)
+        .options(
+            selectinload(Inspection.inspection_type),
+            selectinload(Inspection.records),
+            selectinload(Inspection.actions),
+            selectinload(Inspection.assigned_to),
+        )
+        .where(Inspection.company_id == company_id)
+        .order_by(Inspection.created_at.desc())
+    )
+    return [_to_list_item(i) for i in db.execute(stmt).scalars().all()]
+
+
+def get_inspection(db: Session, inspection_id: int) -> Optional[InspectionOut]:
+    insp = _load_inspection(db, inspection_id)
+    return _to_inspection_out(insp) if insp else None
+
+def create_inspection(db:Session, company_id: int, user_id: int, insp_in) -> "InspectionOut":
+    itype = db.get(InspectionType, insp_in.inspection_type_id)
+    # Número automático
+    inspection_number = insp_in.inspection_number
+    if not inspection_number and itype:
+        inspection_number = next_inspection_number(db, itype)
+
+    # Firmantes predeterminados
+    signers = get_company_signers(db, company_id)
+    creator = db.get(User, user_id)
+
+    elaborated_by   = insp_in.elaborated_by   or (creator.full_name if creator else None)
+    elaborated_role = insp_in.elaborated_role or (signers.elaborated_role if signers else None)
+    reviewed_by     = insp_in.reviewed_by     or (signers.reviewed_by   if signers else None)
+    reviewed_role   = insp_in.reviewed_role   or (signers.reviewed_role if signers else None)
+    approved_by     = insp_in.approved_by     or (signers.approved_by   if signers else None)
+    approved_role   = insp_in.approved_role   or (signers.approved_role if signers else None)
+
+    data = insp_in.model_dump(exclude={
+        "inspection_number",
+        "elaborated_by", "elaborated_role",
+        "reviewed_by", "reviewed_role",
+        "approved_by", "approved_role",
+    })
+    insp = Inspection(
+        company_id=company_id, created_by_id=user_id,
+        inspection_number=inspection_number,
+        elaborated_by=elaborated_by, elaborated_role=elaborated_role,
+        reviewed_by=reviewed_by, reviewed_role=reviewed_role,
+        approved_by=approved_by, approved_role=approved_role,
+        **data,
+    )
+    db.add(insp)
+    db.commit()
+    return _to_inspection_out(_load_inspection(db, insp.id))
+
+def add_record(db: Session, inspection: Inspection, record_in) -> InspectionOut:
+    record = InspectionRecord(
+        inspection_id=inspection.id,
+        order=record_in.order, has_finding=record_in.has_finding,
+    )
+    db.add(record)
+    db.flush()
+    for v in record_in.values:
+        db.add(InspectionFieldValue(
+            record_id=record.id, field_id=v.field_id, value=v.value,
+        ))
+    db.commit()
+    return _to_inspection_out(_load_inspection(db, inspection.id))
+
+
+def update_record(db: Session, record: InspectionRecord, record_in) -> InspectionOut:
+    record.has_finding = record_in.has_finding
+    existing = {v.field_id: v for v in record.values}
+    for v_in in record_in.values:
+        if v_in.field_id in existing:
+            existing[v_in.field_id].value = v_in.value
+        else:
+            db.add(InspectionFieldValue(
+                record_id=record.id, field_id=v_in.field_id, value=v_in.value,
+            ))
+    db.commit()
+    return _to_inspection_out(_load_inspection(db, record.inspection_id))
+
+
+def delete_record(db: Session, record: InspectionRecord) -> InspectionOut:
+    insp_id = record.inspection_id
+    db.delete(record)
+    db.commit()
+    return _to_inspection_out(_load_inspection(db, insp_id))
+
+
+def update_inspection_meta(db: Session, inspection: Inspection,
+                            insp_in: InspectionUpdate) -> InspectionOut:
+    fields = [
+        "status", "inspection_number", "scheduled_date", "completed_date",
+        "assigned_to_id", "location", "start_time", "end_time",
+        "general_observations", "recommendations",
+        "elaborated_by", "reviewed_by", "approved_by",
+        "elaborated_role", "reviewed_role", "approved_role",
+    ]
+    for f in fields:
+        v = getattr(insp_in, f, None)
+        if v is not None:
+            setattr(inspection, f, v)
+    if insp_in.status == InspectionStatusEnum.COMPLETADA and not inspection.completed_date:
+        inspection.completed_date = datetime.now(timezone.utc)
+    db.commit()
+    return _to_inspection_out(_load_inspection(db, inspection.id))
+
+
+# ── Corrective Actions ────────────────────────────────────────────────────────
+
+def create_action(db: Session, inspection_id: int,
+                  action_in: CorrectiveActionCreate) -> CorrectiveActionOut:
+    action = CorrectiveAction(inspection_id=inspection_id, **action_in.model_dump())
+    db.add(action)
+    db.commit()
+    db.refresh(action)
+    return _to_action_out(action)
+
+
+def update_action(db: Session, action: CorrectiveAction,
+                  action_in: CorrectiveActionUpdate) -> CorrectiveActionOut:
+    for f, v in action_in.model_dump(exclude_unset=True).items():
+        setattr(action, f, v)
+    if action.status == ActionStatusEnum.COMPLETADA and not action.completed_at:
+        action.completed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(action)
+    return _to_action_out(action)
+
+
+def delete_action(db: Session, action: CorrectiveAction) -> None:
+    db.delete(action)
+    db.commit()
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+def get_dashboard(db: Session, company_id: int) -> InspectionDashboard:
+    stmt = (
+        select(Inspection)
+        .options(
+            selectinload(Inspection.inspection_type),
+            selectinload(Inspection.records),
+            selectinload(Inspection.actions),
+        )
+        .where(Inspection.company_id == company_id)
+    )
+    inspections = db.execute(stmt).scalars().all()
+    now = datetime.now(timezone.utc)
+
+    total = len(inspections)
+    borrador = en_proceso = completada = cerrada = 0
+    compliance_sum = compliance_cnt = open_actions = overdue = 0
+    type_map: dict = {}
+
+    for insp in inspections:
+        if   insp.status == InspectionStatusEnum.BORRADOR:   borrador += 1
+        elif insp.status == InspectionStatusEnum.EN_PROCESO: en_proceso += 1
+        elif insp.status == InspectionStatusEnum.COMPLETADA: completada += 1
+        elif insp.status == InspectionStatusEnum.CERRADA:    cerrada += 1
+
+        st = _stats(insp)
+        if st["total_records"] > 0:
+            compliance_sum += st["compliance_percent"]
+            compliance_cnt += 1
+        open_actions += st["open_actions"]
+
+        for a in insp.actions:
+            if a.status in (ActionStatusEnum.PENDIENTE, ActionStatusEnum.EN_PROGRESO):
+                end = a.due_date_end
+                if end:
+                    end_aware = end.replace(tzinfo=timezone.utc) if end.tzinfo is None else end
+                    if end_aware < now:
+                        overdue += 1
+
+        tid = insp.inspection_type_id
+        if tid not in type_map:
+            type_map[tid] = {"name": insp.inspection_type.name,
+                             "items": [], "open": 0}
+        type_map[tid]["items"].append(st)
+        type_map[tid]["open"] += st["open_actions"]
+
+    compliance_avg = round(compliance_sum / compliance_cnt, 1) if compliance_cnt else 0.0
+
+    by_type = []
+    for tid, data in type_map.items():
+        items = data["items"]
+        avg = round(sum(i["compliance_percent"] for i in items) / len(items), 1) if items else 0.0
+        semaforo = "green" if avg >= 80 else ("yellow" if avg >= 50 else "red")
+        done = sum(1 for i in inspections
+                   if i.inspection_type_id == tid
+                   and i.status in (InspectionStatusEnum.COMPLETADA, InspectionStatusEnum.CERRADA))
+        by_type.append(InspectionTypeStat(
+            type_id=tid, type_name=data["name"],
+            total=len(items), completed=done,
+            compliance_avg=avg, open_actions=data["open"],
+            semaforo=semaforo,
+        ))
+    by_type.sort(key=lambda x: x.compliance_avg)
+
+    return InspectionDashboard(
+        total=total, borrador=borrador, en_proceso=en_proceso,
+        completada=completada, cerrada=cerrada,
+        compliance_avg=compliance_avg,
+        open_actions=open_actions, overdue_actions=overdue,
+        by_type=by_type,
+    )
+def next_inspection_number(db, itype) -> str:
+    """Genera el próximo número de inspección con nomenclatura automática."""
+    itype.correlativo = (itype.correlativo or 0) + 1
+    db.flush()
+    if itype.nomenclatura:
+        return f"{itype.nomenclatura}-{itype.correlativo:03d}"
+    return str(itype.correlativo)
+def get_company_signers(db, company_id):
+    return db.execute(select(CompanySigners).where(
+        CompanySigners.company_id == company_id)).scalar_one_or_none()
+def upsert_company_signers(db, company_id: int, data: dict):
+    signers = db.execute(select(CompanySigners).where(
+        CompanySigners.company_id == company_id)).scalar_one_or_none()
+    if signers is None:
+        signers = CompanySigners(company_id=company_id, **data)
+        db.add(signers)
+    else:
+        for k, v in data.items():
+            setattr(signers, k, v)
+    db.commit()
+    db.refresh(signers)
+    return signers
+

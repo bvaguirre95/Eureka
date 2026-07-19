@@ -27,9 +27,17 @@ from app.schemas.document_category import (  # noqa: F401
 )
 from app.schemas.dashboard import DashboardSummary  # noqa: F401
 from app.schemas.sequence import (  # noqa: F401
-    SequenceCreate,
-    SequenceUpdate,
-    SequenceOut,SequenceBase,SequenceDateRangeOut,SequencePreview,SequenceResponse
+    SequenceDefBase,
+    SequenceDefCreate,
+    SequenceDefUpdate,
+    SequenceDefOut,
+    SequenceDefMini,
+    SequenceDefWithCounters,
+    SequenceCounterOut,
+    SequenceNextRequest,
+    SequenceNextResponse,
+    SequencePreviewRequest,
+    SequencePreviewResponse,
 )
 
 __all__ = [
@@ -63,11 +71,15 @@ __all__ = [
     "DocumentCategoryUpdate",
     "DocumentCategoryOut",
     "DashboardSummary",
-    "SequenceCreate",
-    "SequenceUpdate",
-    "SequenceOut",
-    "SequenceBase",
-    "SequenceDateRangeOut",
-    "SequencePreview",
-    "SequenceResponse"
+    "SequenceDefCreate",
+    "SequenceDefUpdate",
+    "SequenceDefOut",
+    "SequenceDefBase",
+    "SequenceCounterOut",
+    "SequenceDefMini",
+    "SequenceDefWithCounters",
+    "SequenceNextRequest",
+    "SequenceNextResponse",
+    "SequencePreviewRequest",
+    "SequencePreviewResponse",
 ]

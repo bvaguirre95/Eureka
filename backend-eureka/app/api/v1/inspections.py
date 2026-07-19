@@ -4,13 +4,15 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user, get_db, require_permission
+from app.api.deps import get_current_active_user, get_db, require_permission, require_platform_admin
 from app.core.config import settings
 from app.crud import company as crud_company
 from app.crud import inspection as crud_insp
-from app.models.inspection import Inspection, InspectionRecord, CorrectiveAction
+from app.crud.sequence import get_sequence_def_by_code, create_sequence_def
+from app.models.inspection import Inspection, InspectionRecord, CorrectiveAction, InspectionType
 from app.models.user import User
 from app.schemas.inspection import (
     CorrectiveActionCreate, CorrectiveActionOut, CorrectiveActionUpdate,
@@ -18,6 +20,7 @@ from app.schemas.inspection import (
     InspectionOut, InspectionRecordIn, InspectionTypeCreate,
     InspectionTypeOut, InspectionTypeUpdate, InspectionUpdate,
 )
+from app.schemas.sequence import SequenceDefCreate
 
 router = APIRouter(tags=["Inspecciones"])
 
@@ -176,7 +179,22 @@ def update_inspection(
         raise HTTPException(404, "Inspección no encontrada")
     return crud_insp.update_inspection_meta(db, insp, insp_in)
 
-
+@router.post("/companies/{company_id}/inspections/{inspection_id}/close",
+             response_model=InspectionOut)
+def close_inspection(
+    company_id: int, inspection_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("inspections.create")),
+):
+    """Cierra una inspección completada solo si todas las acciones están resueltas."""
+    _check(db, current_user, company_id)
+    insp = db.get(Inspection, inspection_id)
+    if not insp or insp.company_id != company_id:
+        raise HTTPException(404, "Inspección no encontrada")
+    try:
+        return crud_insp.try_close_inspection(db, insp)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 @router.delete("/companies/{company_id}/inspections/{inspection_id}",
                status_code=204)
 def delete_inspection(
@@ -399,3 +417,48 @@ def download_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── Sincronización de SequenceDefs para tipos existentes ─────────────────────
+
+@router.post("/inspection-types/sync-sequences", tags=["Secuencias"])
+def sync_inspection_sequences(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_platform_admin),
+):
+    """
+    Crea automáticamente las SequenceDef faltantes para todos los tipos
+    de inspección que tengan type_code pero no tengan su secuencia aún.
+
+    Solo accesible por el super-admin de plataforma.
+    Útil para migrar tipos creados antes de implementar el motor de secuencias.
+    """
+    tipos = db.execute(
+        select(InspectionType).where(InspectionType.type_code.isnot(None))
+    ).scalars().all()
+
+    creados = []
+    ya_existian = []
+
+    for tipo in tipos:
+        seq_code = f"insp_{tipo.organization_id}_{tipo.id}"
+        if get_sequence_def_by_code(db, seq_code):
+            ya_existian.append(seq_code)
+            continue
+
+        create_sequence_def(db, SequenceDefCreate(
+            name=f"Inspecciones — {tipo.name}",
+            code=seq_code,
+            template=f"{{company_code}}-{tipo.type_code}-{{number:03}}",
+            padding=3,
+            increment=1,
+            reset_policy="NEVER",
+            description=f"Org {tipo.organization_id} · Tipo {tipo.name} (id={tipo.id})",
+        ))
+        creados.append({"code": seq_code, "type": tipo.name, "type_code": tipo.type_code})
+
+    return {
+        "creados": creados,
+        "ya_existian": ya_existian,
+        "total_tipos_con_code": len(tipos),
+    }

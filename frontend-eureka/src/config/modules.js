@@ -113,7 +113,7 @@ export const MODULE_REGISTRY = [
     label: "Gestión de Inspecciones",
     permissions: ["inspections.view", "inspections.create", "inspections.edit", "inspections.delete"],
     route: "/dashboard/inspecciones",
-    status: "pendiente",
+    status: "activo",
     notes: "Actas de inspección SST por empresa",
   },
   {

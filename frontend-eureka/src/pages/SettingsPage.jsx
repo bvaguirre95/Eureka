@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import documentService from "../services/document.service";
 
+
 export const SettingsPage = () => {
   const { hasPermission, user } = useAuth();
   const canManage = hasPermission("settings.manage") || user?.organization == null;
@@ -36,7 +37,6 @@ export const SettingsPage = () => {
   useEffect(() => {
     loadCategories();
   }, []);
-
   const openCreateModal = () => {
     setEditingCategory(null);
     setModalOpen(true);
@@ -180,13 +180,14 @@ export const SettingsPage = () => {
           </table>
         </div>
       </div>
-
+    
       <CategoryFormModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         category={editingCategory}
         onSaved={loadCategories}
       />
+
     </DashboardLayout>
   );
 };

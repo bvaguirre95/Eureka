@@ -3,206 +3,106 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { AuthProvider } from "./contexts/AuthContext";
 import { PrivateRoute, PublicRoute } from "./routes/PrivateRoute";
 import { PermissionRoute } from "./routes/RoleRoute";
-import LandingPage from "./pages/LandingPage";
-import DashboardPage from "./pages/DashboardPage";
-import UsersPage from "./pages/UsersPage";
-import RolesPage from "./pages/RolesPage";
-import CompaniesPage from "./pages/CompaniesPage";
-import DocumentMatrixPage from "./pages/DocumentMatrixPage";
-import DocumentCatalogPage from "./pages/DocumentCatalogPage";
-import SettingsPage from "./pages/SettingsPage";
-import { DiagnosticListPage } from "./pages/DiagnosticListPage";
-import { DiagnosticFormPage } from "./pages/DiagnosticFormPage";
-import InspectionTypesPage from "./pages/InspectionTypesPage";
-import InspectionListPage from "./pages/InspectionListPage";
-import { InspectionFormPage } from "./pages/InspectionFormPage";
+
+import LandingPage             from "./pages/LandingPage";
+import DashboardPage           from "./pages/DashboardPage";
+import UsersPage               from "./pages/UsersPage";
+import RolesPage               from "./pages/RolesPage";
+import CompaniesPage           from "./pages/CompaniesPage";
+import CompanyHubPage          from "./pages/CompanyHubPage";
+import DocumentMatrixPage      from "./pages/DocumentMatrixPage";
+import DocumentCatalogPage     from "./pages/DocumentCatalogPage";
+import SettingsPage            from "./pages/SettingsPage";
+import { DiagnosticListPage }  from "./pages/DiagnosticListPage";
+import { DiagnosticFormPage }  from "./pages/DiagnosticFormPage";
+import InspectionTypesPage     from "./pages/InspectionTypesPage";
+import InspectionListPage      from "./pages/InspectionListPage";
+import { InspectionFormPage }  from "./pages/InspectionFormPage";
 import { InspectionDashboardPage } from "./pages/InspectionDashboardPage";
-import OrganizationsPage from "./pages/OrganizationsPage";
+import OrganizationsPage       from "./pages/OrganizationsPage";
+import SequencePage            from "./pages/SequencePage";
+import { GeritraPage }         from "./pages/GeritraPage";
+import { GeritraMatrixPage }   from "./pages/GeritraMatrixPage";
+import { GeritraConfigSection }  from "./components/geritra/GeritraConfigSection";
 
 import "./App.css";
+
+// Wrapper reutilizable para rutas privadas con permisos
+const PR = ({ perms, children }) => (
+  <PrivateRoute>
+    <PermissionRoute requiredPermissions={perms}>
+      {children}
+    </PermissionRoute>
+  </PrivateRoute>
+);
 
 function App() {
   return (
     <Router>
       <AuthProvider>
         <Routes>
-          {/* Ruta pública - Landing Page (incluye login) */}
-          <Route
-            path="/"
-            element={
-              <PublicRoute>
-                <LandingPage />
-              </PublicRoute>
-            }
-          />
+          {/* ── Pública ─────────────────────────────────────────────────── */}
+          <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
 
-          {/* Panel privado - el contenido se adapta según el rol */}
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <DashboardPage />
-              </PrivateRoute>
-            }
-          />
+          {/* ── Dashboard ───────────────────────────────────────────────── */}
+          <Route path="/dashboard"
+            element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
 
-          {/* Organizaciones (solo super-admin de plataforma) */}
-          <Route
-            path="/dashboard/organizaciones"
-            element={
-              <PrivateRoute>
-                <PermissionRoute platformAdminOnly>
-                  <OrganizationsPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── Solo super-admin ─────────────────────────────────────────── */}
+          <Route path="/dashboard/secuencias"
+            element={<PrivateRoute><PermissionRoute platformAdminOnly><SequencePage /></PermissionRoute></PrivateRoute>} />
+          <Route path="/dashboard/organizaciones"
+            element={<PrivateRoute><PermissionRoute platformAdminOnly><OrganizationsPage /></PermissionRoute></PrivateRoute>} />
 
-          {/* Empresas */}
-          <Route
-            path="/dashboard/empresas"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["companies.view"]}>
-                  <CompaniesPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── Empresas ─────────────────────────────────────────────────── */}
+          <Route path="/dashboard/empresas"
+            element={<PR perms={["companies.view"]}><CompaniesPage /></PR>} />
 
-          {/* Tipos de inspección (configuración) */}
-          <Route
-            path="/dashboard/tipos-inspeccion"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["inspections.view", "inspections.manage"]}>
-                  <InspectionTypesPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* HUB — punto de entrada a todos los módulos de una empresa */}
+          <Route path="/dashboard/empresas/:companyId"
+            element={<PR perms={["companies.view"]}><CompanyHubPage /></PR>} />
 
-          {/* Dashboard de inspecciones por empresa */}
-          <Route
-            path="/dashboard/empresas/:companyId/inspecciones/dashboard"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["inspections.view"]}>
-                  <InspectionDashboardPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── Inspecciones ─────────────────────────────────────────────── */}
+          <Route path="/dashboard/tipos-inspeccion"
+            element={<PR perms={["inspections.view","inspections.manage"]}><InspectionTypesPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/inspecciones/dashboard"
+            element={<PR perms={["inspections.view"]}><InspectionDashboardPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/inspecciones"
+            element={<PR perms={["inspections.view"]}><InspectionListPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/inspecciones/:inspectionId"
+            element={<PR perms={["inspections.view"]}><InspectionFormPage /></PR>} />
 
-          {/* Listado de inspecciones por empresa */}
-          <Route
-            path="/dashboard/empresas/:companyId/inspecciones"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["inspections.view"]}>
-                  <InspectionListPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── GERITRA ──────────────────────────────────────────────────── */}
+          <Route path="/dashboard/empresas/:companyId/geritra"
+            element={<PR perms={["risks.view"]}><GeritraPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/geritra/:matrixId"
+            element={<PR perms={["risks.view"]}><GeritraMatrixPage /></PR>} />
 
-          {/* Formulario de inspección */}
-          <Route
-            path="/dashboard/empresas/:companyId/inspecciones/:inspectionId"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["inspections.view"]}>
-                  <InspectionFormPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── Diagnósticos ─────────────────────────────────────────────── */}
+          <Route path="/dashboard/empresas/:companyId/diagnosticos"
+            element={<PR perms={["diagnostics.view"]}><DiagnosticListPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/diagnosticos/:diagnosticId"
+            element={<PR perms={["documents.view"]}><DiagnosticFormPage /></PR>} />
 
-          {/* Diagnóstico Anexo 1 - lista por empresa */}
-          <Route
-            path="/dashboard/empresas/:companyId/diagnosticos"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["diagnostics.view"]}>
-                  <DiagnosticListPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── Documentos ───────────────────────────────────────────────── */}
+          <Route path="/dashboard/empresas/:companyId/documentos"
+            element={<PR perms={["documents.view"]}><DocumentMatrixPage /></PR>} />
+          <Route path="/dashboard/catalogo-documentos"
+            element={<PR perms={["documents.view"]}><DocumentCatalogPage /></PR>} />
 
-          {/* Diagnóstico Anexo 1 - formulario */}
-          <Route
-            path="/dashboard/empresas/:companyId/diagnosticos/:diagnosticId"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["documents.view"]}>
-                  <DiagnosticFormPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── Configuración ────────────────────────────────────────────── */}
+          <Route path="/dashboard/configuracion/categorias-documentos"
+            element={<PR perms={["settings.manage.category"]}><SettingsPage /></PR>} />
+          <Route path="/dashboard/configuracion/geritra"
+            element={<PR perms={["settings.manage.geritra"]}><GeritraConfigSection /></PR>} />
 
-          {/* Gestión Documental de una empresa */}
-          <Route
-            path="/dashboard/empresas/:companyId/documentos"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["documents.view"]}>
-                  <DocumentMatrixPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
+          {/* ── Usuarios y Roles ─────────────────────────────────────────── */}
+          <Route path="/dashboard/usuarios"
+            element={<PR perms={["users.view"]}><UsersPage /></PR>} />
+          <Route path="/dashboard/roles"
+            element={<PR perms={["roles.view","roles.manage"]}><RolesPage /></PR>} />
 
-          {/* Catálogo normativo de documentos */}
-          <Route
-            path="/dashboard/catalogo-documentos"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["documents.view"]}>
-                  <DocumentCatalogPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
-
-          {/* Configuración (categorías) */}
-          <Route
-            path="/dashboard/configuracion"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["settings.view"]}>
-                  <SettingsPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
-
-          {/* Usuarios */}
-          <Route
-            path="/dashboard/usuarios"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["users.view"]}>
-                  <UsersPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
-
-          {/* Roles y Permisos */}
-          <Route
-            path="/dashboard/roles"
-            element={
-              <PrivateRoute>
-                <PermissionRoute requiredPermissions={["roles.view", "roles.manage"]}>
-                  <RolesPage />
-                </PermissionRoute>
-              </PrivateRoute>
-            }
-          />
-
-          {/* Ruta por defecto */}
+          {/* ── Fallback ─────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

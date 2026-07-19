@@ -75,6 +75,7 @@ class InspectionType(Base):
     fields       = relationship("InspectionTypeField", back_populates="inspection_type",
                                 cascade="all, delete-orphan", order_by="InspectionTypeField.order")
     inspections  = relationship("Inspection", back_populates="inspection_type")
+    type_code   = Column(String(50), nullable=True)  # "extintores" | "baños" | "epp" | etc.
 
 
     def __repr__(self):
@@ -234,6 +235,8 @@ class CorrectiveAction(Base):
     inspection  = relationship("Inspection", back_populates="actions")
     record      = relationship("InspectionRecord", back_populates="actions")
     responsible = relationship("User")
+    responsible_name = Column(String(200), nullable=True)
+
 
     def __repr__(self):
         return f"<CorrectiveAction id={self.id} item={self.item_ref} status={self.status}>"

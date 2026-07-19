@@ -37,8 +37,8 @@ PERMISSIONS_CATALOG = [
     ("documents.manage_catalog",   "Documentos", "Gestionar catálogo normativo", "Crear y editar items del catálogo normativo"),
 
     # ── Configuración ─────────────────────────────────────────────────────────
-    ("settings.manage", "Configuración", "Gestionar configuración", "Administrar categorías y ajustes del módulo documental"),
-
+    ("settings.manage.category", "Configuración", "Gestionar configuración", "Administrar categorías y ajustes del módulo documental"),
+    ("settings.manage.geritra",  "Configuración", "Gestionar GERITRA",      "Administrar categorías y factores de riesgo del módulo GERITRA"),
     # ── Diagnóstico Anexo 1 ───────────────────────────────────────────────────
     ("diagnostics.view",   "Diagnósticos", "Ver diagnósticos",    "Consultar diagnósticos Anexo 1"),
     ("diagnostics.create", "Diagnósticos", "Crear diagnósticos",  "Iniciar y editar diagnósticos Anexo 1"),
@@ -51,6 +51,17 @@ PERMISSIONS_CATALOG = [
     ("inspections.manage", "Inspecciones", "Gestionar tipos de inspección","Crear y configurar tipos de inspección (solo Supervisor/Admin)"),
     ("inspections.delete", "Inspecciones", "Eliminar inspecciones",        "Eliminar registros de inspección"),
 
+    ("sequences.view",    "Secuencias", "Ver secuencias","Consultar definiciones y contadores de secuencias"),
+    ("sequences.create",  "Secuencias", "Crear secuencias","Registrar nuevas definiciones de secuencia"),
+    ("sequences.edit",    "Secuencias", "Editar secuencias","Modificar definiciones de secuencia"),
+    ("sequences.delete",  "Secuencias", "Eliminar secuencias", "Eliminar definiciones y sus contadores"),
+    ("sequences.execute", "Secuencias", "Ejecutar secuencias", "Generar el siguiente código de una secuencia"),
+
+    ("risks.view",   "GERITRA", "Ver matrices de riesgo",      "Consultar matrices GERITRA y puestos de trabajo"),
+    ("risks.create", "GERITRA", "Crear/editar matrices",       "Registrar y editar matrices de riesgo y puestos"),
+    ("risks.manage", "GERITRA", "Gestionar catálogo de riesgos","Crear categorías y factores de riesgo"),
+    ("risks.delete", "GERITRA", "Eliminar matrices",           "Eliminar matrices y puestos de trabajo"),
+    # ── NUEVO MÓDULO — plantilla para 
     # ── NUEVO MÓDULO — plantilla para copiar ──────────────────────────────────
     # ("mi_modulo.view",   "Mi Módulo", "Ver X",    "..."),
     # ("mi_modulo.create", "Mi Módulo", "Crear X",  "..."),

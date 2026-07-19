@@ -1,238 +1,175 @@
-import React, { useCallback, useEffect, useState } from "react";
-import Swal from "sweetalert2";
-import { Building2, ClipboardCheck, ClipboardList, FileText, Pencil, Plus, Users } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CompanyLogo } from "../components/companies/CompanyLogo";
-import { Pagination } from "../components/common/Pagination";
-import { SearchInput } from "../components/common/SearchInput";
-import { CompanyFormModal } from "../components/companies/CompanyFormModal";
+import { Building2, ChevronRight, Plus, Search, Users } from "lucide-react";
+import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
-import { useDebounce } from "../hooks/useDebounce";
 import companyService from "../services/company.service";
-import { DashboardLayout } from "../components/layout/DashboardLayout";
-import { CompanySignersModal } from "../components/companies/CompanySignersModal";
-const PAGE_SIZE = 20;
+import { CompanyFormModal } from "../components/companies/CompanyFormModal";
 
 export const CompaniesPage = () => {
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission("companies.create");
-  const canEdit = hasPermission("companies.edit");
-  const canViewDocs = hasPermission("documents.view");
-
-  const navigate = useNavigate();
 
   const [companies, setCompanies] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [signersCompany, setSignersCompany] = useState(null);
-
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 350);
-
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState("");
+  const [page, setPage]           = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingCompany, setEditingCompany] = useState(null);
 
-  const loadCompanies = useCallback(async () => {
+  const load = async (q = search, p = page) => {
     setLoading(true);
     try {
-      const data = await companyService.getCompanies({
-        search: debouncedSearch || undefined,
-        skip,
-        limit: PAGE_SIZE,
-      });
-      setCompanies(data.items);
-      setTotal(data.total);
-    } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "No se pudieron cargar las empresas",
-        text: error.response?.data?.detail || "Intenta nuevamente",
-        confirmButtonColor: "#16a34a",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, skip]);
-
-  useEffect(() => {
-    setSkip(0);
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    loadCompanies();
-  }, [loadCompanies]);
-
-  const openCreateModal = () => {
-    setEditingCompany(null);
-    setModalOpen(true);
+      const data = await companyService.getCompanies({ search: q, page: p, page_size: 20 });
+      setCompanies(data.items || data);
+      setTotalPages(data.total_pages || 1);
+    } catch { /**/ } finally { setLoading(false); }
   };
 
-  const openEditModal = (company) => {
-    setEditingCompany(company);
-    setModalOpen(true);
+  useEffect(() => { load(); }, []);
+
+  const handleSearch = (v) => {
+    setSearch(v);
+    setPage(1);
+    load(v, 1);
   };
 
   return (
     <DashboardLayout>
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Empresas</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Empresas registradas y su acceso a la gestión documental.
+          <p className="text-sm text-gray-500 mt-1">
+            Selecciona una empresa para acceder a sus módulos SST.
           </p>
         </div>
-
         {canCreate && (
-          <Button
-            onClick={openCreateModal}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Empresa
+          <Button onClick={() => setModalOpen(true)}
+            className="bg-green-600 hover:bg-green-700 text-white">
+            <Plus className="w-4 h-4 mr-2" /> Nueva Empresa
           </Button>
         )}
       </div>
 
-      <div className="mb-4">
-        <SearchInput
+      {/* Búsqueda */}
+      <div className="relative mb-5">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
           value={search}
-          onChange={setSearch}
+          onChange={e => handleSearch(e.target.value)}
           placeholder="Buscar por RUC o razón social..."
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none bg-white"
         />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
-              <tr>
-                <th className="px-4 py-3">Empresa</th>
-                <th className="px-4 py-3">RUC</th>
-                <th className="px-4 py-3">Trabajadores</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto" />
-                  </td>
-                </tr>
-              ) : companies.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
-                    No se encontraron empresas
-                  </td>
-                </tr>
-              ) : (
-                companies.map((company) => (
-                  <tr key={company.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <CompanyLogo companyId={company.id} hasLogo={company.has_logo} size={36} />
-                        <div>
-                          <p className="font-medium text-gray-900">{company.razon_social}</p>
-                          {company.nombre_comercial && (
-                            <p className="text-xs text-gray-500">{company.nombre_comercial}</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{company.ruc}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-gray-400" />
-                        {company.num_trabajadores}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {company.is_active ? (
-                        <span className="text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
-                          Activa
-                        </span>
-                      ) : (
-                        <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
-                          Inactiva
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        {canViewDocs && (
-                          <button
-                            onClick={() => navigate(`/dashboard/empresas/${company.id}/inspecciones/dashboard`)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-600 transition-colors"
-                            aria-label={`Inspecciones de ${company.razon_social}`}
-                            title="Inspecciones SST"
-                          >
-                            <ClipboardList className="w-4 h-4" />
-                          </button>
-                        )}
-                        {canViewDocs && (
-                          <button
-                            onClick={() => navigate(`/dashboard/empresas/${company.id}/diagnosticos`)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-600 transition-colors"
-                            aria-label={`Diagnóstico Anexo 1 de ${company.razon_social}`}
-                            title="Diagnóstico Anexo 1"
-                          >
-                            <ClipboardCheck className="w-4 h-4" />
-                          </button>
-                        )}
-                        {canViewDocs && (
-                          <button
-                            onClick={() => navigate(`/dashboard/empresas/${company.id}/documentos`)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-600 transition-colors"
-                            aria-label={`Gestión documental de ${company.razon_social}`}
-                            title="Gestión documental"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                        )}
-                        {canEdit && (
-                          <button
-                            onClick={() => openEditModal(company)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-green-600 transition-colors"
-                            aria-label={`Editar ${company.razon_social}`}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        )}
-                        {canEdit && (
-                          <button
-                            onClick={() => setSignersCompany(company)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-600 transition-colors"
-                            title="Configurar firmantes del informe"
-                          >
-                            <Users className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* Lista */}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
         </div>
+      ) : companies.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-14 text-center">
+          <Building2 className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-400 font-medium">
+            {search ? "Sin resultados para esa búsqueda" : "No hay empresas registradas"}
+          </p>
+          {canCreate && !search && (
+            <Button onClick={() => setModalOpen(true)}
+              className="mt-4 bg-green-600 hover:bg-green-700 text-white">
+              <Plus className="w-4 h-4 mr-1" /> Crear primera empresa
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Cabecera tabla */}
+          <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100
+            text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <div className="col-span-5">Empresa</div>
+            <div className="col-span-3">RUC</div>
+            <div className="col-span-2">Trabajadores</div>
+            <div className="col-span-1">Estado</div>
+            <div className="col-span-1" />
+          </div>
 
-        <Pagination total={total} skip={skip} limit={PAGE_SIZE} onPageChange={setSkip} />
-      </div>
+          {/* Filas */}
+          {companies.map(company => (
+            <div key={company.id}
+              onClick={() => navigate(`/dashboard/empresas/${company.id}`)}
+              className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-50
+                hover:bg-green-50/30 cursor-pointer transition-colors items-center group">
+
+              {/* Empresa */}
+              <div className="col-span-5 flex items-center gap-3 min-w-0">
+                {company.logo_url ? (
+                  <img src={company.logo_url} alt=""
+                    className="w-9 h-9 rounded-lg object-contain border border-gray-100 flex-shrink-0" />
+                ) : (
+                  <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-4 h-4 text-green-500" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">
+                    {company.razon_social}
+                  </p>
+                  {company.nombre_comercial && company.nombre_comercial !== company.razon_social && (
+                    <p className="text-xs text-gray-400 truncate">{company.nombre_comercial}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* RUC */}
+              <div className="col-span-3">
+                <span className="text-sm text-gray-600 font-mono">{company.ruc}</span>
+              </div>
+
+              {/* Trabajadores */}
+              <div className="col-span-2 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-gray-300" />
+                <span className="text-sm text-gray-600">{company.num_trabajadores}</span>
+              </div>
+
+              {/* Estado */}
+              <div className="col-span-1">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
+                  ${company.is_active === true || company.is_active === 1 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                  {company.is_active === true || company.is_active === 1 ? "Activa" : "Inactiva"}
+                </span>
+              </div>
+
+              {/* Flecha */}
+              <div className="col-span-1 flex justify-end">
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-green-500 transition-colors" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+          <span>Página {page} de {totalPages}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" disabled={page <= 1}
+              onClick={() => { setPage(p => p - 1); load(search, page - 1); }}
+              className="text-xs">← Anterior</Button>
+            <Button variant="outline" disabled={page >= totalPages}
+              onClick={() => { setPage(p => p + 1); load(search, page + 1); }}
+              className="text-xs">Siguiente →</Button>
+          </div>
+        </div>
+      )}
 
       <CompanyFormModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        company={editingCompany}
-        onSaved={loadCompanies}
+        onSaved={() => { setModalOpen(false); load(); }}
       />
-      <CompanySignersModal
-       open={!!signersCompany}
-       onClose={() => setSignersCompany(null)}
-       company={signersCompany}
-     />
     </DashboardLayout>
   );
 };

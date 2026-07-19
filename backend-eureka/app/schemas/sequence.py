@@ -1,52 +1,160 @@
-from datetime import date
+"""
+Schemas del Sequence Engine.
 
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+Siguen el mismo patrón Base / Create / Update / Out del resto del proyecto.
+Se agregan schemas específicos para la API del motor:
+  - SequenceNextRequest  → payload para generar el siguiente código
+  - SequenceNextResponse → resultado con el código generado
+  - SequencePreviewRequest → previsualizar sin consumir número
+"""
 
-# Esquema base con campos comunes
-class SequenceBase(BaseModel):
-    name: str = Field(..., description="Nombre descriptivo de la secuencia", max_length=100)
-    code: str = Field(..., description="Código técnico único para identificarla", max_length=50)
-    prefix: Optional[str] = Field("", description="Prefijo de texto con o sin formatos de fecha (ej: FAC-%Y-)")
-    suffix: Optional[str] = Field("", description="Sufijo de texto (ej: -LOG)")
-    padding: int = Field(4, ge=1, le=10, description="Cantidad de ceros a rellenar a la izquierda")
-    number_increment: int = Field(1, ge=1, description="Incremento por cada registro creado")
-    number_next: int = Field(1, ge=1, description="Siguiente número correlativo global")
-    use_date_range: bool = Field(False, description="Activar si la numeración se reinicia por periodos de tiempo")
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-# Esquema para recibir datos al CREAR una secuencia
-class SequenceCreate(SequenceBase):
-    pass  # Hereda todos los campos de SequenceBase
+from pydantic import BaseModel, Field, field_validator
 
-# Esquema para recibir datos al ACTUALIZAR una secuencia
-class SequenceUpdate(BaseModel):
-    name: Optional[str] = None
-    prefix: Optional[str] = None
-    suffix: Optional[str] = None
-    padding: Optional[int] = None
-    number_next: Optional[int] = None
-
-# Esquema para MOSTRAR los datos en las respuestas de la API
-class SequenceResponse(SequenceBase):
-    id: int
-
-    # Configuración requerida en Pydantic v2 para leer modelos de SQLAlchemy
-    model_config = ConfigDict(from_attributes=True)
-class SequenceDateRangeOut(BaseModel):
-    id: int
-    sequence_id: int
-    date_from: date
-    date_to: date
-    number_next: int
-
-    model_config = ConfigDict(from_attributes=True)
-class SequenceOut(SequenceBase):
-    id: int
-    ranges: List[SequenceDateRangeOut] = Field(default=[])
-
-    model_config = ConfigDict(from_attributes=True)
+from app.models.sequence import ResetPolicyEnum
 
 
-class SequencePreview(BaseModel):
-    code: str
-    generated_value: str
+# ── SequenceDef ───────────────────────────────────────────────────────────────
+
+class SequenceDefBase(BaseModel):
+    name:         str            = Field(..., min_length=1, max_length=150)
+    code:         str            = Field(..., min_length=1, max_length=80)
+    template:     str            = Field(..., min_length=1, max_length=255)
+    padding:      int            = Field(4, ge=1, le=10)
+    increment:    int            = Field(1, ge=1)
+    reset_policy: ResetPolicyEnum = ResetPolicyEnum.NEVER
+    is_active:    bool           = True
+    description:  Optional[str] = None
+
+    @field_validator("code")
+    @classmethod
+    def code_lowercase(cls, v: str) -> str:
+        """El code siempre se normaliza a snake_case sin espacios."""
+        return v.strip().lower().replace(" ", "_")
+
+    @field_validator("template")
+    @classmethod
+    def template_has_number(cls, v: str) -> str:
+        """El template debe contener {number} o {number:Xd}."""
+        if "{number" not in v:
+            raise ValueError("El template debe contener {number} o {number:Xd}")
+        return v.strip()
+
+
+class SequenceDefCreate(SequenceDefBase):
+    pass
+
+
+class SequenceDefUpdate(BaseModel):
+    name:         Optional[str]            = None
+    template:     Optional[str]            = None
+    padding:      Optional[int]            = Field(None, ge=1, le=10)
+    increment:    Optional[int]            = Field(None, ge=1)
+    reset_policy: Optional[ResetPolicyEnum] = None
+    is_active:    Optional[bool]           = None
+    description:  Optional[str]           = None
+
+    @field_validator("template")
+    @classmethod
+    def template_has_number(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and "{number" not in v:
+            raise ValueError("El template debe contener {number} o {number:Xd}")
+        return v
+
+
+class SequenceDefOut(SequenceDefBase):
+    id:         int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SequenceDefMini(BaseModel):
+    """Vista compacta para listas/selects."""
+    id:       int
+    name:     str
+    code:     str
+    template: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+# ── SequenceCounter ───────────────────────────────────────────────────────────
+
+class SequenceCounterOut(BaseModel):
+    """Solo lectura — los contadores los gestiona el motor internamente."""
+    id:              int
+    sequence_def_id: int
+    scope_key:       str
+    current_value:   int
+    reset_at:        Optional[str]
+    updated_at:      datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ── Motor: generar siguiente código ──────────────────────────────────────────
+
+class SequenceNextRequest(BaseModel):
+    """
+    Payload para llamar al motor y obtener el siguiente código.
+
+    Ejemplo:
+        {
+            "code": "inspection",
+            "context": {"company": "EMP", "inspection_type": "IEXT"},
+            "scope":   {"company": 1, "inspection_type": 2}
+        }
+    """
+    code:    str                  = Field(..., description="code de la SequenceDef")
+    context: Dict[str, Any]       = Field(default_factory=dict,
+                                          description="Variables para renderizar el template")
+    scope:   Dict[str, Any]       = Field(default_factory=dict,
+                                          description="Claves para identificar el contador")
+
+    @field_validator("code")
+    @classmethod
+    def code_lowercase(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class SequenceNextResponse(BaseModel):
+    """Respuesta del motor."""
+    code:          str           # code de la secuencia usada
+    generated:     str           # el código generado, p. ej. "EMP-IEXT-001"
+    scope_key:     str           # scope canónico usado
+    current_value: int           # número consumido
+
+
+class SequencePreviewRequest(BaseModel):
+    """
+    Previsualizar cómo quedaría el próximo código SIN consumirlo.
+    Útil para mostrar al usuario en la UI antes de crear una inspección.
+    """
+    code:    str            = Field(...)
+    context: Dict[str, Any] = Field(default_factory=dict)
+    scope:   Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("code")
+    @classmethod
+    def code_lowercase(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class SequencePreviewResponse(BaseModel):
+    code:        str
+    preview:     str   # número simulado, no consumido
+    next_value:  int   # valor que se consumiría
+
+
+# ── Respuesta lista con contadores ───────────────────────────────────────────
+
+class SequenceDefWithCounters(SequenceDefOut):
+    counters: List[SequenceCounterOut] = []

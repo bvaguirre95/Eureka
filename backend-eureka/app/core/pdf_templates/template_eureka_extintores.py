@@ -7,6 +7,8 @@ Genera DOS documentos en un solo PDF:
 import base64, os
 from datetime import datetime
 from weasyprint import HTML
+from app.core.pdf_templates.static_assets import get_extintor_pqs, get_extintor_co2, get_logo
+
 
 MESES = ["","Enero","Febrero","Marzo","Abril","Mayo","Junio",
          "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
@@ -40,13 +42,13 @@ def _img_b64(path: str, fallback_b64: str = "") -> str:
 FIXED_COLS = [
     ("num_extintor",   "N° de Extintor",          "txt",   "30px"),
     ("tipo_de_extintor", "Tipo de Extintor",         "txt",   "40px"),
-    ("clase_de_agente",   "Clase de Agente Extintor", "txt",   "40px"),
-    ("capacidad",      "Capacidad (Lb)",            "txt",   "35px"),
-    ("fecha_recarga",  "Fecha Recarga Actual",      "txt",   "45px"),
-    ("prox_recarga",   "Próxima Recarga",           "txt",   "45px"),
+    ("clase_de_agente_extintor",   "Clase de Agente Extintor", "txt",   "40px"),
+    ("capacidad_lb",      "Capacidad (Lb)",            "txt",   "35px"),
+    ("actual",  "Fecha Recarga Actual",      "txt",   "45px"),
+    ("proxima",   "Próxima Recarga",           "txt",   "45px"),
     ("ubicacion",      "Ubicación",                 "txt",   "55px"),
     # ── Condiciones del Extintor ────────────────────────────────────────
-    ("sello_garantia", "Sello de garantía",         "check", "30px"),
+    ("sello_de_garantia", "Sello de garantía",         "check", "30px"),
     ("manometro",      "Manómetro",                 "check", "30px"),
     ("presion",        "Presión",                   "check", "30px"),
     ("recipiente",     "Recipiente",                "check", "30px"),
@@ -64,39 +66,55 @@ def _get_val(record, field_key: str) -> str:
             return v.value or ""
     return ""
 
-def _x(val, positive="S", td=True) -> str:
-    """Genera celda <td> con X coloreada según resultado."""
-    if val == positive:
-        content = "✕"
+def _x(val, expected="S", td=True) -> str:
+    """
+    Genera celda <td> para una subcolumna S/N o B/M.
+    expected = el valor que hace que ESTA columna tenga la X.
+    Si val == expected → X verde (condición buena).
+    Si val != expected → celda vacía.
+    Si val == "" → celda vacía.
+    """
+    if not val:
+        cell = ''
+        cls = "chk"
+    elif val == expected:
+        cell = "✕"
         cls = "chk-ok"
-    elif val and val != positive:
-        content = "✕"
-        cls = "chk-no"
     else:
-        content = ""
+        cell = ''
         cls = "chk"
     if td:
-        return f'<td class="c {cls}">{content}</td>'
-    return content
+        return f'<td class="c {cls}">{cell}</td>'
+    return cell
 
 def generate(insp, company, doc: str = "ambos") -> bytes:
     # Cargar imágenes del glosario desde archivos estáticos
-    from app.core.pdf_templates.static_assets import get_extintor_pqs, get_extintor_co2
     pqs_b64 = get_extintor_pqs()
     co2_b64 = get_extintor_co2()
+    logo_eureka=get_logo()
 
     # ── Logos ────────────────────────────────────────────────────────────────
     logo_src = _img_b64(getattr(company, "logo_path", None))
     logo_html = (f'<img src="{logo_src}" style="max-height:55px;max-width:120px;object-fit:contain">'
                  if logo_src else f'<span style="font-size:9pt;font-weight:bold">{company.razon_social}</span>')
 
-    comp_desc = (getattr(company, "intro_inspeccion", None)
-                 or getattr(company, "descripcion", None)
-                 or f"empresa dedicada a sus actividades comerciales.")
+    comp_desc = (getattr(company, "descripcion", None))
+    comp_intr= (getattr(company, "intro_inspeccion", None))
     nro = insp.inspection_number or "1"
     fecha_insp = _date_short(insp.scheduled_date)
     fecha_larga = _date_long_upper(insp.scheduled_date)
     fecha_elab = _date_long_upper(insp.completed_date or datetime.now())
+    company_rs = company.razon_social
+    itype_upper = insp.inspection_type_name.upper()
+    insp_nro = insp.inspection_number or "—"
+    fecha_hoy = _date_short(datetime.now())
+    elaborado_by = (insp.elaborated_by or "—").upper()
+    # Logo grande para portada
+    logo_html_large = (
+        f'<img src="{logo_src}" style="height:;width:7.3cm;object-fit:contain">'
+        if logo_src else
+        f'<p style="font-size:24pt;font-weight:bold;color:#1f3864">{company.razon_social}</p>'
+    )
 
     # ── Construir filas de la MATRIZ ─────────────────────────────────────────
     matrix_rows = ""
@@ -105,7 +123,7 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
         def gv(key): return _get_val(record, key)
 
         cond_bad = any([
-            gv("sello_garantia") == "N",
+            gv("sello_de_garantia") == "N",
             gv("manometro") == "M",
             gv("presion") == "M",
             gv("recipiente") == "M",
@@ -122,12 +140,12 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
           <td class="c">{i}</td>
           <td class="c">{gv('num_extintor') or f'00{i}'}</td>
           <td class="c">{gv('tipo_de_extintor')}</td>
-          <td class="c">{gv('clase_agente')}</td>
-          <td class="c">{gv('capacidad')}</td>
-          <td class="c">{gv('fecha_recarga')}</td>
-          <td class="c">{gv('prox_recarga')}</td>
+          <td class="c">{gv('clase_de_agente_extintor')}</td>
+          <td class="c">{gv('capacidad_lb')}</td>
+          <td class="c">{gv('actual')}</td>
+          <td class="c">{gv('proxima')}</td>
           <td>{gv('ubicacion')}</td>
-          {_x(gv('sello_garantia'),'S')}{_x(gv('sello_garantia'),'N')}
+          {_x(gv('sello_de_garantia'),'S')}{_x(gv('sello_de_garantia'),'N')}
           {_x(gv('manometro'),'B')}{_x(gv('manometro'),'M')}
           {_x(gv('presion'),'B')}{_x(gv('presion'),'M')}
           {_x(gv('recipiente'),'B')}{_x(gv('recipiente'),'M')}
@@ -156,22 +174,31 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
     # ── Hallazgos para el INFORME (2 filas por extintor) ────────────────────
     hallazgos_informe = ""
     for a in insp.actions:
-        # Buscar el registro correspondiente
         ubic = ""
         tipo_txt = ""
+        foto_html = '<span style="font-size:7pt;color:#ccc;">Sin foto</span>'
+        num_extintor = a.item_ref or "—"
+
         for record in insp.records:
-            if _get_val(record, "num_extintor") == a.item_ref:
-                ubic = _get_val(record, "ubicacion")
-                tipo_val = _get_val(record, "tipo_de_extintor")
-                clase_val = _get_val(record, "clase_de_agente")
-                cap_val = _get_val(record, "capacidad")
+            if record.id == a.record_id or _get_val(record, "num_extintor") == a.item_ref:
+                ubic      = _get_val(record, "ubicacion")
+                num_ext   = _get_val(record, "num_extintor")
+                tipo_val  = _get_val(record, "tipo_de_extintor")
+                clase_val = _get_val(record, "clase_de_agente_extintor")
+                cap_val   = _get_val(record, "capacidad_lb")
+                if num_ext:
+                    num_extintor = f"Extintor N° {num_ext}"
                 tipo_txt = f"Tipo: {tipo_val}<br>Clase: {clase_val}<br>Capacidad: {cap_val} lbs"
+                if getattr(record, "photo_path", None):
+                    foto_src = _img_b64(record.photo_path)
+                    if foto_src:
+                        foto_html = f'<img src="{foto_src}" style="max-width:70px;max-height:65px;object-fit:cover;border-radius:3px;border:1px solid #ddd;">'
                 break
 
         hallazgos_informe += f"""
         <tr>
-          <td class="c bold" rowspan="2">{a.item_ref or "—"}</td>
-          <td class="c foto" rowspan="2"><span class="foto-placeholder">📷<br><small>Foto</small></span></td>
+          <td class="c bold" rowspan="2">{num_extintor}</td>
+          <td class="c foto" rowspan="2">{foto_html}</td>
           <td>{tipo_txt}<br><br><em>Observación:</em> {a.description}</td>
           <td>{a.action or "—"}</td>
         </tr>
@@ -180,7 +207,6 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
         </tr>"""
     if not hallazgos_informe:
         hallazgos_informe = '<tr><td colspan="4" class="c i">Sin hallazgos registrados</td></tr>'
-
     # ── Recomendaciones ──────────────────────────────────────────────────────
     recs = getattr(insp, "recommendations", None) or ""
     recs_default = [
@@ -236,29 +262,48 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
   }}
   @page informe  {{
     size: A4 portrait;
-    margin: 14mm 10mm 14mm 10mm;
-    @top-center {{
-      content: "INSPECCIÓN DE {insp.inspection_type_name.upper()} N°{nro}";
-      font-family: Arial, sans-serif;
-      font-size: 8pt;
-      font-weight: bold;
-      color: #1f3864;
-    }}
+    margin: 52mm 10mm 14mm 10mm;
+    @top-left-corner {{ content: none; }}
+    @top-left   {{ content: element(running-header); width: 100%; }}
+    @top-center {{ content: none; }}
+    @top-right  {{ content: none; }}
+  }}
+  @page portada-page {{
+    size: A4 portrait;
+    margin: 52mm 10mm 14mm 10mm;
+    @top-left {{ content: element(running-header); width: 100%; }}
   }}
   @page :first {{ @top-center {{ content: none; }} }}
 
   * {{ box-sizing:border-box; margin:0; padding:0; font-family:Arial,sans-serif; }}
   body {{ font-size:8.5pt; color:#1a1a1a; line-height:1.4; }}
+  /* ── RUNNING HEADER (se repite en cada página del informe) ── */
+  .running-header {{
+    position: running(running-header);
+    width: auto;
+  }}
+  .page-border {{
+    position: absolute;
+    top: -5mm;
+    left: -5mm;
+    right: -5mm;
+    bottom: -230mm;
+    border: 1.5px solid #000;
+    pointer-events: none;
+    z-index: -1;
+}}
 
   /* ── PORTADA ── */
+  @page portada-page {{ @top-left {{ content: element(running-header); width: 100%; }} }}
   .portada {{
-    min-height: 260mm;
+    min-height: 200mm;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
     page-break-after: always;
+    page: portada-page;
   }}
   .portada .logo-area {{ margin-bottom: 30px; }}
   .portada h1 {{ font-size:18pt; font-weight:bold; color:#1f3864; margin-bottom:8px; }}
@@ -275,9 +320,26 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
   .doc-header .meta {{ text-align:right; font-size:7.5pt; font-weight:bold; }}
 
   /* ── TABLA INFO (fechas) ── */
-  .info-table {{ width:100%; border-collapse:collapse; margin-bottom:10px; }}
-  .info-table td {{ border:1px solid #999; padding:4px 8px; font-size:8.5pt; }}
-  .info-table td:first-child {{ font-weight:bold; background:#f0f0f0; width:45%; }}
+/* ── TABLA INFO (fechas) ── */
+.info-table {{
+    width: 100%;               /* Solo ocupa lo necesario */
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+}}
+.info-table td {{
+    border: 1px solid #999;
+    padding: 4px 8px;
+    font-size: 10pt;
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    white-space: nowrap;        /* Evita que el texto se parta */
+}}
+
+.info-table td:first-child {{
+    font-weight: bold;
+}}
 
   /* ── ENCABEZADO SUBRAYADO ── */
   h2.sec {{ font-size:10pt; font-weight:bold; color:#1f3864; margin:12px 0 5px;
@@ -456,39 +518,75 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
 </div>
 <!-- ##SPLIT## -->
 <div class="informe">
-<!-- Encabezado del Informe -->
-<table class="doc-header">
-  <tr>
-    <td class="logo-cell" rowspan="4">{logo_html}</td>
-    <td class="title-cell" rowspan="3">{company.razon_social}<br>
-      <span style="font-size:8pt;font-weight:normal">SISTEMA DE GESTIÓN DE SEGURIDAD Y SALUD EN EL TRABAJO</span>
-    </td>
-    <td class="meta">VERSIÓN: 01</td>
-  </tr>
-  <tr><td class="meta">CÓDIGO: SIG-IEXT-01</td></tr>
-  <tr><td class="meta">FECHA: {_date_short(datetime.now())}</td></tr>
-  <tr>
-    <td class="blue" colspan="2">INFORME DE INSPECCIÓN DE {insp.inspection_type_name.upper()}</td>
-  </tr>
-</table>
 
-<p style="text-align:center;font-size:14pt;font-weight:bold;margin:10px 0 4px">INFORME DE INSPECCIÓN</p>
-<p style="text-align:center;font-size:11pt;font-weight:bold;margin-bottom:4px">{insp.inspection_type_name.upper()} PORTÁTILES</p>
-<p style="text-align:center;font-size:10pt;margin-bottom:10px">{company.razon_social}</p>
-
-<table class="info-table">
+<!-- ENCABEZADO RUNNING — se repite en todas las páginas del informe -->
+<div class="running-header">
+  <div class="page-border"></div>
+  <table class="doc-header" style="width:100%;border-collapse:collapse;table-layout:fixed;">
+    <tr>
+      <td rowspan="3" style="width:80px;border:1.5px solid #000;text-align:center;vertical-align:middle;padding:3px;">
+        {logo_html}
+      </td>
+      <td rowspan="3" style="border:1.5px solid #000;text-align:center;vertical-align:middle;font-family:Arial,sans-serif;font-size:14pt;font-weight:bold;padding:4px 6px;">
+        {company_rs}
+      </td>
+      <td style="width:130px;border:1.5px solid #000;font-family:Arial,sans-serif;font-size:7pt;font-weight:bold;padding:3px 6px;">VERSIÓN: 01</td>
+    </tr>
+    <tr>
+      <td style="border:1.5px solid #000;font-family:Arial,sans-serif;font-size:7pt;font-weight:bold;padding:3px 6px;">CÓDIGO: {insp_nro}</td>
+    </tr>
+    <tr>
+      <td style="border:1.5px solid #000;font-family:Arial,sans-serif;font-size:7pt;font-weight:bold;padding:3px 6px;">FECHA: {fecha_hoy}</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="border:1.5px solid #000;background:#1f3864;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:8pt;font-weight:bold;padding:3px 6px;">
+        SISTEMA DE GESTIÓN DE SEGURIDAD Y SALUD EN EL TRABAJO
+      </td>
+    </tr>
+    <tr>
+      <td colspan="3" style="border:1.5px solid #000;background:#1f3864;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:8pt;font-weight:bold;padding:3px 6px;">
+        INFORME DE INSPECCIÓN DE {itype_upper}
+      </td>
+    </tr>
+  </table>
+</div>
+<!-- ══ PORTADA ══ -->
+<div class="portada">
+  <p style="text-align:center;font-size:28pt;font-weight:bold;color:#000000;margin-bottom:12px">INFORME DE INSPECCIÓN</p>
+  <p style="text-align:center;font-size:28pt;font-weight:bold;color:#000000;margin-bottom:8px">{itype_upper}</p>
+  <div style="text-align:center;margin:20px 0;">
+    {logo_html_large}
+  </div>
+  <div>
+    <p style="text-align:center;font-size:24pt;font-weight:bold;color:#000000;margin-bottom:12px">{company_rs}</p>
+  </div>
+  <br>
+<br>
+<br>
+  <table class="info-table">
   <tr><td>FECHA DE INSPECCIÓN:</td><td>{fecha_larga}</td></tr>
   <tr><td>FECHA DE ELABORACIÓN DE INFORME:</td><td>{fecha_elab}</td></tr>
-  <tr><td>ELABORADO POR:</td><td>{(insp.elaborated_by or "—").upper()}</td></tr>
+  <tr><td>ELABORADO POR:</td><td>{elaborado_by}</td></tr>
 </table>
+<br>
+<br>
+<br>
+<div style="text-align:center; margin-top:20px;">
+    <img src="{logo_eureka}"
+         style="width:7.3cm;height:auto;">
+</div>
+</div>
+
+<!-- ══ CUERPO DEL INFORME ══ -->
+
+
 
 <h2 class="sec">1. Introducción</h2>
-<p><strong>{company.razon_social}</strong> {comp_desc}</p>
-<p>Durante el desarrollo de la presente inspección se tomarán en cuenta diversos aspectos que influyen en el funcionamiento seguro del establecimiento; para ello, se elaborará una lista de chequeo que permitirá conocer el estado de los extintores, su correcta clasificación de acuerdo con el área donde se encuentran ubicados y el cumplimiento de la normativa vigente. Posteriormente, se comunicarán al responsable las condiciones identificadas, con el fin de establecer medidas preventivas y/o correctivas que garanticen la seguridad de los trabajadores, clientes e instalaciones.</p>
-
+<p><strong>{company_rs}</strong> {comp_desc}</p>
+<p>{comp_intr}</p>
 <h2 class="sec">2. Objetivos</h2>
 <h3 class="sub">2.1 Objetivo general</h3>
-<p>Evaluar el estado y las condiciones en las que se encuentran los extintores de <strong>{company.razon_social}</strong>, por medio de una inspección técnica utilizando el formato de check list para proponer medidas preventivas y correctivas que minimicen los peligros y riesgos.</p>
+<p>Evaluar el estado y las condiciones en las que se encuentran los extintores de <strong>{company_rs}</strong>, por medio de una inspección técnica utilizando el formato de check list para proponer medidas preventivas y correctivas que minimicen los peligros y riesgos.</p>
 <h3 class="sub">2.2 Objetivos específicos</h3>
 <ul>
   <li>Identificar las deficiencias de los extintores portátiles con los que cuenta la empresa por medio de la inspección técnica utilizando el formato de check list.</li>
@@ -497,7 +595,7 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
 </ul>
 
 <h2 class="sec">3. Áreas de aplicación y/o Alcance</h2>
-<p>Aplica para todas las áreas operativa y administrativa en donde se presenten peligros y riesgos dentro de las instalaciones de <strong>{company.razon_social}</strong>.</p>
+<p>Aplica para todas las áreas operativa y administrativa en donde se presenten peligros y riesgos dentro de las instalaciones de <strong>{company_rs}</strong>.</p>
 
 <h2 class="sec">4. Definiciones</h2>
 <p><strong>Extintor:</strong> aparato mecánico portátil que contiene un agente de extinción para proyectar y dirigirlo sobre el fuego por efecto de una presión interna.</p>
@@ -520,12 +618,12 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
 
 <h2 class="sec">5. Estándares</h2>
 <ul>
-  <li>En todas las áreas de <strong>{company.razon_social}</strong>, donde se presenten riesgos potenciales de combustión, deben estar equipadas con sistemas de extinción de incendios del tipo más adecuado a la naturaleza del combustible utilizado.</li>
+  <li>En todas las áreas de <strong>{company_rs}</strong>, donde se presenten riesgos potenciales de combustión, deben estar equipadas con sistemas de extinción de incendios del tipo más adecuado a la naturaleza del combustible utilizado.</li>
   <li>Todos los extintores portátiles, a implementar o que se encuentren implementados en las instalaciones, deben cumplir con los requisitos establecidos en las normas técnicas ecuatorianas RTE INEN 006 y la norma NFPA 10 vigente.</li>
 </ul>
 
 <h2 class="sec">6. Metodología</h2>
-<p>Recorrido por las instalaciones de <strong>{company.razon_social}</strong>, para la verificación de los extintores existentes, estado y ubicación. Se evaluará cada uno de los siguientes ítems:</p>
+<p>Recorrido por las instalaciones de <strong>{company_rs}</strong>, para la verificación de los extintores existentes, estado y ubicación. Se evaluará cada uno de los siguientes ítems:</p>
 <ul>
   <li>Estado del extintor</li>
   <li>Número de extintor · Tipo de extintor · Clase de agente extintor · Capacidad</li>
@@ -539,10 +637,10 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
   <tr><td>B</td><td>Lesión, o enfermedad grave, incapacidad temporal, y/o daño menor a la propiedad.</td><td><strong>PRONTA</strong></td></tr>
   <tr><td>C</td><td>Lesiones menores incapacitantes, enfermedad leve o daños menores a la propiedad.</td><td><strong>POSTERIOR</strong></td></tr>
 </table>
-<p>Se realizó la visita e inspección visual a cada uno de los extintores de <strong>{company.razon_social}</strong>, llevando registro fotográfico y llenando el formato de lista de chequeo respectivo.</p>
+<p>Se realizó la visita e inspección visual a cada uno de los extintores de <strong>{company_rs}</strong>, llevando registro fotográfico y llenando el formato de lista de chequeo respectivo.</p>
 
 <h2 class="sec">7. Descripción de la empresa</h2>
-<p><strong>{company.razon_social}</strong> {comp_desc}</p>
+<p><strong>{company_rs}</strong> {comp_desc}</p>
 
 <h2 class="sec">8. Hallazgos</h2>
 <p>Se evaluaron los extintores de acuerdo con la norma NFPA 10 vigente y al Reglamento RTE INEN 006.</p>
@@ -570,7 +668,6 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
     if doc == "ambos":
         return HTML(string=html, base_url="/").write_pdf()
 
-    # Separar por marcador único
     MARKER = "<!-- ##SPLIT## -->"
     if MARKER not in html:
         return HTML(string=html, base_url="/").write_pdf()

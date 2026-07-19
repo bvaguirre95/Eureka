@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -21,6 +21,7 @@ class Company(Base):
     ruc = Column(String(13), unique=True, index=True, nullable=False)
     razon_social = Column(String(200), nullable=False)
     nombre_comercial = Column(String(200), nullable=True)
+    company_code = Column(String(20), nullable=True, index=True)  # "MET", "ABC" — usado en secuencias
     industria = Column(String(100), nullable=True)
     num_trabajadores = Column(Integer, nullable=False, default=0)
 
@@ -31,6 +32,7 @@ class Company(Base):
     logo_path      = Column(String(500), nullable=True)
     descripcion    = Column(Text, nullable=True)   # texto libre sobre qué hace la empresa
     intro_inspeccion = Column(Text, nullable=True) # intro personalizada para informes PDF
+    geritra_config   = Column(JSON, nullable=True)  # configuración GERITRA por empresa
 
     is_active = Column(Boolean, default=True, nullable=False)
 

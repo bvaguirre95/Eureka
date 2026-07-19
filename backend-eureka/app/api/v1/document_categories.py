@@ -19,7 +19,7 @@ router = APIRouter(prefix="/document-categories", tags=["Categorías de Document
 def list_categories(
     only_active: bool = Query(False),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents.view")),
+    current_user: User = Depends(require_permission("settings.manage")),
 ):
     return crud_cat.get_categories(db, current_user.organization_id, only_active=only_active)
 

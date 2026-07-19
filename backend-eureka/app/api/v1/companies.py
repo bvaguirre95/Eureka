@@ -173,3 +173,4 @@ def delete_company_logo(
             pass
 
     return crud_company.remove_company_logo(db, company)
+

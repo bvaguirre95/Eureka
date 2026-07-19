@@ -39,7 +39,7 @@ const emptyField = (order) => ({
 export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSaved }) => {
   const [form, setForm] = useState({
     name: "", description: "", periodicity: "mensual",
-    pdf_template: "generico", nomenclatura: "",
+    pdf_template: "generico", type_code: "",
   });
   const [fields, setFields]       = useState([emptyField(0)]);
   const [templates, setTemplates] = useState([{ key: "generico", label: "Genérico" }]);
@@ -60,7 +60,7 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
         description:  typeData.description  || "",
         periodicity:  typeData.periodicity  || "mensual",
         pdf_template: typeData.pdf_template || "generico",
-        nomenclatura: typeData.nomenclatura || "",
+        type_code:    typeData.type_code    || "",
       });
       setFields(typeData.fields.length > 0
         ? typeData.fields.map(f => ({
@@ -71,7 +71,7 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
         : [emptyField(0)]);
     } else {
       setForm({ name: "", description: "", periodicity: "mensual",
-                pdf_template: "generico", nomenclatura: "" });
+                pdf_template: "generico", type_code: "" });
       setFields([emptyField(0)]);
     }
   }, [open, typeData]);
@@ -94,7 +94,7 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
     try {
       const payload = {
         ...form,
-        nomenclatura: form.nomenclatura.trim().toUpperCase() || null,
+        type_code: form.type_code.trim().toUpperCase() || null,
         fields: fields.filter(f => f.name.trim()).map((f, idx) => ({
           ...f,
           field_key: f.field_key || slugify(f.name),
@@ -155,18 +155,19 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
 
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                Prefijo de numeración
+                Código del tipo
               </label>
               <input
-                value={form.nomenclatura}
-                onChange={e => setForm({...form, nomenclatura: e.target.value.toUpperCase()})}
-                placeholder="Ej: TIN-IEXT"
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none font-mono"
+                value={form.type_code}
+                onChange={e => setForm({...form, type_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")})}
+                placeholder="EXT, EPP, BAÑ..."
+                maxLength={20}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none font-mono uppercase"
               />
               <p className="text-xs text-gray-400 mt-1">
-                {form.nomenclatura
-                  ? <>Genera: <strong className="text-green-600 font-mono">{form.nomenclatura}-001</strong>, {form.nomenclatura}-002...</>
-                  : "Sin prefijo: 1, 2, 3..."}
+                {form.type_code
+                  ? <>Código generado: <strong className="text-green-600 font-mono">ABC-{form.type_code}-001</strong></>
+                  : "Se usa en el código de la inspección. Ej: EXT → ABC-EXT-001"}
               </p>
             </div>
 

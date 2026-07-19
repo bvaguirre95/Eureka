@@ -288,39 +288,69 @@ const ServiceGalleryModal = ({ service, images, onClose }) => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white shadow-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br flex items-center justify-center shadow-lg">
-                <img
-                  src="/logo.png"
-                  alt="EUREKA Logo"
-                  className="h-10 w-10 sm:h-12 sm:w-12 rounded-full"
-                />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                  EUREKA
-                </h1>
-                <p className="text-xs sm:text-sm text-green-600 font-medium">
-                  Sistemas Integrados de Gestión
-                </p>
-              </div>
+     <header className="bg-white shadow-md sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center py-4">
+        {/* LOGO */}
+        <div className="flex items-center space-x-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg">
+            <img
+              src="/logo.png"
+              alt="EUREKA Consultoría"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-full"
+            />
+          </div>
+
+          <div>
+            <div className="text-xl sm:text-2xl font-bold text-gray-900">
+              EUREKA
             </div>
 
-            <Button
-              onClick={() => setShowLoginModal(true)}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <LogIn className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Iniciar Sesión</span>
-              <span className="sm:hidden">Login</span>
-            </Button>
+            <p className="text-xs sm:text-sm text-green-600 font-medium">
+              Sistemas Integrados de Gestión
+            </p>
           </div>
         </div>
-      </header>
 
+        {/* MENÚ + LOGIN */}
+        <div className="flex items-center gap-8">
+
+          <nav className="hidden lg:flex items-center gap-6">
+            <a href="#servicios" className="text-gray-700 hover:text-green-600">
+              Servicios
+            </a>
+
+            <a href="#clientes" className="text-gray-700 hover:text-green-600">
+              Clientes
+            </a>
+
+            <a href="#industrias" className="text-gray-700 hover:text-green-600">
+              Industrias
+            </a>
+
+            <a href="#contacto" className="text-gray-700 hover:text-green-600">
+              Contacto
+            </a>
+          </nav>
+
+          <Button
+            onClick={() => setShowLoginModal(true)}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <LogIn className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">
+              Iniciar Sesión
+            </span>
+            <span className="sm:hidden">
+              Login
+            </span>
+          </Button>
+
+        </div>
+
+      </div>
+      </div>
+</header>
       {/* Modal de Login */}
       <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
         <DialogContent className="sm:max-w-[425px]">

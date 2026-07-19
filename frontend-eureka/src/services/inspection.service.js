@@ -57,6 +57,7 @@ const downloadPdf = async (cId, id, filename, doc = "ambos") => {
   a.download = filename || `inspeccion_${id}.pdf`;
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 };
+const closeInspection = (cId, id) => api.post(`${cmpPrefix(cId)}/${id}/close`);
 
 const inspectionService = {
   getTypes, createType, updateType, deactivateType, getTemplates,
@@ -65,6 +66,6 @@ const inspectionService = {
   uploadRecordPhoto, deleteRecordPhoto,
   createAction, updateAction, deleteAction,
   getSigners, updateSigners,
-  getDashboard, downloadPdf,
+  getDashboard, downloadPdf,closeInspection
 };
 export default inspectionService;

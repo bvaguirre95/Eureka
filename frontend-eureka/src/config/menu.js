@@ -1,24 +1,18 @@
 import {
+  Activity,
   Briefcase,
   Building2,
   ClipboardCheck,
   ClipboardList,
   FileText,
+  Hash,
   Home,
   Settings,
   ShieldCheck,
   Users,
 } from "lucide-react";
+import { Children } from "react";
 
-/**
- * Definición centralizada del menú. Cada nuevo módulo se agrega aquí como
- * una entrada más, indicando con qué permiso(s) se habilita (OR) y, opcionalmente,
- * una condición extra `show(user)` para casos especiales (ej. super-admin).
- *
- * - `permissions: []` -> visible para cualquier usuario autenticado.
- * - `enabled: false` -> se muestra como "Próximamente".
- * - `show(user)` -> si se define, además de los permisos, debe cumplirse esta condición.
- */
 export const MENU_ITEMS = [
   {
     label: "Inicio",
@@ -27,15 +21,24 @@ export const MENU_ITEMS = [
     permissions: [],
     enabled: true,
   },
+  // ── Solo super-admin (sin organización) ───────────────────────────────────
   {
     label: "Organizaciones",
     path: "/dashboard/organizaciones",
     icon: Briefcase,
     permissions: [],
     enabled: true,
-    // Solo el super-admin de plataforma (sin organización) ve este módulo.
     show: (user) => !user?.organization,
   },
+  {
+    label: "Secuencias",
+    path: "/dashboard/secuencias",
+    icon: Hash,
+    permissions: [],
+    enabled: true,
+    show: (user) => !user?.organization,
+  },
+  // ── Todos los usuarios con organización ───────────────────────────────────
   {
     label: "Empresas",
     path: "/dashboard/empresas",
@@ -52,10 +55,25 @@ export const MENU_ITEMS = [
   },
   {
     label: "Configuración",
-    path: "/dashboard/configuracion",
     icon: Settings,
-    permissions: ["documents.view"],
+    permissions: ["settings.view", "documents.view"],
     enabled: true,
+    children: [
+      {
+        label: "Categorías de Documentos",
+        path: "/dashboard/configuracion/categorias-documentos",
+        icon: FileText,
+        permissions: ["settings.manage.category"],
+        enabled: true,
+      },
+      {
+        label: "GERITRA",
+        path: "/dashboard/configuracion/geritra",
+        icon: ShieldCheck,
+        permissions: ["settings.manage.geritra"],
+        enabled: true,
+      },
+    ],
   },
   {
     label: "Tipos de Inspección",
@@ -93,9 +111,40 @@ export const MENU_ITEMS = [
  * @param {object} user
  */
 export const getMenuForUser = (hasPermission, user) =>
-  MENU_ITEMS.filter((item) => {
-    const permissionOk =
-      item.permissions.length === 0 || hasPermission(...item.permissions);
-    const showOk = item.show ? item.show(user) : true;
-    return permissionOk && showOk;
-  });
+  MENU_ITEMS
+    .filter((item) => {
+      const permissionOk =
+        item.permissions.length === 0 ||
+        hasPermission(...item.permissions);
+
+      const showOk = item.show ? item.show(user) : true;
+
+      return permissionOk && showOk;
+    })
+    .map((item) => {
+      // Si no tiene submenús, se devuelve normalmente
+      if (!item.children) {
+        return item;
+      }
+
+      // Filtrar los submenús según permisos
+      const children = item.children.filter((child) => {
+        const permissionOk =
+          child.permissions.length === 0 ||
+          hasPermission(...child.permissions);
+
+        return permissionOk;
+      });
+
+      // Si no tiene ningún submenú visible,
+      // no mostramos el menú padre
+      if (children.length === 0) {
+        return null;
+      }
+
+      return {
+        ...item,
+        children,
+      };
+    })
+    .filter(Boolean);

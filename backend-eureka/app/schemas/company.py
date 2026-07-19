@@ -10,15 +10,17 @@ class CompanyBase(BaseModel):
     ruc: str
     razon_social: str
     nombre_comercial: Optional[str] = None
+    company_code: Optional[str] = None      # "MET", "ABC" — usado en secuencias
     industria: Optional[str] = None
     num_trabajadores: int = 0
     direccion: Optional[str] = None
     ciudad: Optional[str] = None
     telefono: Optional[str] = None
     email_contacto: Optional[EmailStr] = None
+    is_active: Optional[bool] = None
     descripcion: Optional[str] = None
     intro_inspeccion: Optional[str] = None
-    is_active: bool = True
+    geritra_config: Optional[dict] = None
 
     @field_validator("num_trabajadores")
     @classmethod
@@ -46,6 +48,7 @@ class CompanyCreate(CompanyBase):
 class CompanyUpdate(BaseModel):
     razon_social: Optional[str] = None
     nombre_comercial: Optional[str] = None
+    company_code: Optional[str] = None
     industria: Optional[str] = None
     num_trabajadores: Optional[int] = None
     direccion: Optional[str] = None
@@ -54,6 +57,7 @@ class CompanyUpdate(BaseModel):
     email_contacto: Optional[EmailStr] = None
     descripcion: Optional[str] = None
     intro_inspeccion: Optional[str] = None
+    geritra_config: Optional[dict] = None
     is_active: Optional[bool] = None
 
 

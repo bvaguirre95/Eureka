@@ -58,9 +58,12 @@ export const AuthProvider = ({ children }) => {
   /**
    * Verifica si el usuario actual tiene alguno de los permisos indicados.
    * Uso: hasPermission("companies.create") o hasPermission("a", "b") (OR).
-   * user.role.permissions es un array de objetos {id, code, name, ...}
+   * El super-admin (sin organización) tiene acceso total a todo.
    */
   const hasPermission = (...codes) => {
+    if (!user) return false;
+    // Super-admin de plataforma: acceso total
+    if (!user.organization) return true;
     if (!user?.role?.permissions) return false;
     const permCodes = user.role.permissions.map((p) =>
       typeof p === "string" ? p : p.code

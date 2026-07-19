@@ -72,3 +72,5 @@ def get_extintor_pqs() -> str:
 
 def get_extintor_co2() -> str:
     return _cached("extintores/co2.png")
+def get_logo() -> str:
+    return _cached("logo.png")

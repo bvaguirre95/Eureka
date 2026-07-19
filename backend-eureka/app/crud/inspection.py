@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from slugify import slugify
@@ -16,8 +16,12 @@ from app.schemas.inspection import (
     InspectionListItem, InspectionOut, InspectionRecordOut,
     InspectionTypeCreate, InspectionTypeOut,
     InspectionTypeStat, InspectionTypeFieldOut, InspectionUpdate,
+    ActionSummary, WeeklyStats,
 )
-from app.models.company import CompanySigners
+from app.models.company import Company, CompanySigners
+from app.services.sequence_engine import SequenceEngine
+from app.crud.sequence import get_sequence_def_by_code, create_sequence_def
+from app.schemas.sequence import SequenceDefCreate
 from app.models.user import User
 # ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -77,14 +81,30 @@ def _to_record_out(record: InspectionRecord) -> InspectionRecordOut:
 
 
 def _to_action_out(a: CorrectiveAction) -> CorrectiveActionOut:
+    # Calcular VENCIDA automáticamente
+    now = datetime.now(timezone.utc)
+    status = a.status
+    if (
+        status not in (ActionStatusEnum.COMPLETADA,)
+        and a.due_date_end
+        and a.due_date_end < now
+    ):
+        status = ActionStatusEnum.VENCIDA
+
+    # responsible_name: primero el campo libre, luego el usuario vinculado
+    resp_name = (
+        a.responsible_name
+        or (a.responsible.full_name if a.responsible else None)
+    )
+
     return CorrectiveActionOut(
         id=a.id, inspection_id=a.inspection_id, record_id=a.record_id,
         item_ref=a.item_ref, description=a.description, action=a.action,
         priority=a.priority, due_date_start=a.due_date_start,
-        due_date_end=a.due_date_end, status=a.status,
+        due_date_end=a.due_date_end, status=status,
         completion_notes=a.completion_notes, completed_at=a.completed_at,
         responsible_id=a.responsible_id,
-        responsible_name=a.responsible.full_name if a.responsible else None,
+        responsible_name=resp_name,
         created_at=a.created_at,
     )
 
@@ -156,15 +176,22 @@ def get_inspection_type(db: Session, type_id: int) -> Optional[InspectionType]:
 
 def create_inspection_type(db: Session, org_id: int, user_id: int,
                             type_in: InspectionTypeCreate) -> InspectionTypeOut:
+    # Normalizar type_code: mayúsculas, sin espacios, máx 20 chars
+    type_code = None
+    if getattr(type_in, "type_code", None):
+        type_code = type_in.type_code.strip().upper()[:20]
+
     itype = InspectionType(
         organization_id=org_id, name=type_in.name,
+        type_code=type_code,
         description=type_in.description, icon=type_in.icon,
         periodicity=type_in.periodicity, is_active=type_in.is_active,
-        pdf_template=getattr(type_in, "pdf_template", "generico") or "generico", nomenclatura=type_in.nomenclatura,
+        pdf_template=getattr(type_in, "pdf_template", "generico") or "generico",
         created_by_id=user_id,
     )
     db.add(itype)
     db.flush()
+
     for idx, f in enumerate(type_in.fields):
         key = f.field_key or slugify(f.name, separator="_")
         db.add(InspectionTypeField(
@@ -173,7 +200,25 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
             is_required=f.is_required, order=f.order or idx,
             group_name=f.group_name,
         ))
+
     db.commit()
+
+    # Crear SequenceDef para este tipo si tiene type_code
+    # code: "insp_<org_id>_<type_id>" — único por organización + tipo
+    # scope: organization + company → aislamiento multitenant completo
+    if type_code:
+        seq_code = f"insp_{org_id}_{itype.id}"
+        if not get_sequence_def_by_code(db, seq_code):
+            create_sequence_def(db, SequenceDefCreate(
+                name=f"Inspecciones — {itype.name}",
+                code=seq_code,
+                template=f"{{company_code}}-{type_code}-{{number:03}}",
+                padding=3,
+                increment=1,
+                reset_policy="NEVER",
+                description=f"Org {org_id} · Tipo {itype.name} (id={itype.id})",
+            ))
+
     t = _load_type(db, itype.id)
     out = InspectionTypeOut.model_validate(t)
     out.field_count = len(t.fields)
@@ -182,7 +227,7 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
 
 def update_inspection_type(db: Session, itype: InspectionType,
                             type_in) -> InspectionTypeOut:
-    for f in ["name", "description", "icon", "periodicity", "is_active", "pdf_template","nomenclatura"]:
+    for f in ["name", "description", "icon", "periodicity", "is_active", "pdf_template", "type_code"]:
         v = getattr(type_in, f, None)
         if v is not None:
             setattr(itype, f, v)
@@ -238,7 +283,7 @@ def create_inspection(db:Session, company_id: int, user_id: int, insp_in) -> "In
     # Número automático
     inspection_number = insp_in.inspection_number
     if not inspection_number and itype:
-        inspection_number = next_inspection_number(db, itype)
+        inspection_number = next_inspection_number(db, itype, company_id)
 
     # Firmantes predeterminados
     signers = get_company_signers(db, company_id)
@@ -307,19 +352,63 @@ def delete_record(db: Session, record: InspectionRecord) -> InspectionOut:
 
 def update_inspection_meta(db: Session, inspection: Inspection,
                             insp_in: InspectionUpdate) -> InspectionOut:
-    fields = [
-        "status", "inspection_number", "scheduled_date", "completed_date",
-        "assigned_to_id", "location", "start_time", "end_time",
-        "general_observations", "recommendations",
-        "elaborated_by", "reviewed_by", "approved_by",
-        "elaborated_role", "reviewed_role", "approved_role",
-    ]
+    # Bloquear edición si ya está COMPLETADA o CERRADA
+    # Solo se permite cambiar el status (para cerrar) y campos de firmas
+    locked = inspection.status in (
+        InspectionStatusEnum.COMPLETADA, InspectionStatusEnum.CERRADA
+    )
+    if locked:
+        allowed_when_locked = {
+            "status", "elaborated_by", "reviewed_by", "approved_by",
+            "elaborated_role", "reviewed_role", "approved_role",
+            "recommendations", "general_observations",
+        }
+        fields = list(allowed_when_locked)
+    else:
+        fields = [
+            "status", "inspection_number", "scheduled_date", "completed_date",
+            "assigned_to_id", "location", "start_time", "end_time",
+            "general_observations", "recommendations",
+            "elaborated_by", "reviewed_by", "approved_by",
+            "elaborated_role", "reviewed_role", "approved_role",
+        ]
+
     for f in fields:
         v = getattr(insp_in, f, None)
         if v is not None:
             setattr(inspection, f, v)
+
     if insp_in.status == InspectionStatusEnum.COMPLETADA and not inspection.completed_date:
         inspection.completed_date = datetime.now(timezone.utc)
+
+    db.commit()
+    return _to_inspection_out(_load_inspection(db, inspection.id))
+
+
+def try_close_inspection(db: Session, inspection: Inspection) -> InspectionOut:
+    """
+    Intenta cerrar la inspección.
+    Solo se puede cerrar si:
+      1. Está en estado COMPLETADA
+      2. Todas las acciones correctivas están COMPLETADAS
+    Retorna la inspección actualizada (cerrada o no).
+    """
+    if inspection.status != InspectionStatusEnum.COMPLETADA:
+        raise ValueError("Solo se puede cerrar una inspección completada.")
+
+    now = datetime.now(timezone.utc)
+    pending = [
+        a for a in inspection.actions
+        if a.status not in (ActionStatusEnum.COMPLETADA,)
+        and not (a.due_date_end and a.due_date_end < now)  # excluir vencidas ya aceptadas
+    ]
+    if pending:
+        raise ValueError(
+            f"Hay {len(pending)} acción(es) correctiva(s) pendientes. "
+            "Completa todas antes de cerrar la inspección."
+        )
+
+    inspection.status = InspectionStatusEnum.CERRADA
     db.commit()
     return _to_inspection_out(_load_inspection(db, inspection.id))
 
@@ -416,20 +505,120 @@ def get_dashboard(db: Session, company_id: int) -> InspectionDashboard:
         ))
     by_type.sort(key=lambda x: x.compliance_avg)
 
+    # ── Estadísticas semanales ────────────────────────────────────────────────
+    week_start = now - timedelta(days=now.weekday())
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    inspections_this_week = sum(
+        1 for i in inspections
+        if i.created_at and i.created_at.replace(tzinfo=timezone.utc) >= week_start
+    )
+    completed_this_week = sum(
+        1 for i in inspections
+        if i.completed_date
+        and i.completed_date.replace(tzinfo=timezone.utc) >= week_start
+    )
+    all_actions = [a for i in inspections for a in i.actions]
+    actions_created_week = sum(
+        1 for a in all_actions
+        if a.created_at and a.created_at.replace(tzinfo=timezone.utc) >= week_start
+    )
+    actions_completed_week = sum(
+        1 for a in all_actions
+        if a.completed_at and a.completed_at.replace(tzinfo=timezone.utc) >= week_start
+    )
+
+    weekly = WeeklyStats(
+        inspections_this_week=inspections_this_week,
+        completed_this_week=completed_this_week,
+        actions_created_this_week=actions_created_week,
+        actions_completed_this_week=actions_completed_week,
+    )
+
+    # ── Acciones vencidas y próximas a vencer ─────────────────────────────────
+    due_soon_limit = now + timedelta(days=7)
+    actions_overdue = []
+    actions_due_soon = []
+
+    for insp in inspections:
+        for a in insp.actions:
+            if a.status == ActionStatusEnum.COMPLETADA:
+                continue
+            end = a.due_date_end
+            if not end:
+                continue
+            end_aware = end.replace(tzinfo=timezone.utc) if end.tzinfo is None else end
+            summary = ActionSummary(
+                id=a.id,
+                inspection_id=insp.id,
+                inspection_number=insp.inspection_number,
+                inspection_type=insp.inspection_type.name,
+                description=a.description,
+                responsible_name=a.responsible_name or (
+                    a.responsible.full_name if a.responsible else None
+                ),
+                due_date_end=end_aware,
+                status=a.status.value,
+                priority=a.priority,
+                days_overdue=int((now - end_aware).days) if end_aware < now else -int((end_aware - now).days),
+            )
+            if end_aware < now:
+                actions_overdue.append(summary)
+            elif end_aware <= due_soon_limit:
+                actions_due_soon.append(summary)
+
+    actions_overdue.sort(key=lambda x: x.days_overdue, reverse=True)
+    actions_due_soon.sort(key=lambda x: x.due_date_end)
+
     return InspectionDashboard(
         total=total, borrador=borrador, en_proceso=en_proceso,
         completada=completada, cerrada=cerrada,
         compliance_avg=compliance_avg,
         open_actions=open_actions, overdue_actions=overdue,
         by_type=by_type,
+        weekly=weekly,
+        actions_overdue=actions_overdue,
+        actions_due_soon=actions_due_soon,
     )
-def next_inspection_number(db, itype) -> str:
-    """Genera el próximo número de inspección con nomenclatura automática."""
-    itype.correlativo = (itype.correlativo or 0) + 1
-    db.flush()
-    if itype.nomenclatura:
-        return f"{itype.nomenclatura}-{itype.correlativo:03d}"
-    return str(itype.correlativo)
+def next_inspection_number(db: Session, itype: InspectionType, company_id: int) -> str:
+    """
+    Genera el próximo número de inspección usando el Sequence Engine.
+
+    scope multitenant: organization + company
+      - Dos organizaciones con el mismo tipo nunca comparten contador.
+      - Dos empresas de la misma organización tienen contadores independientes.
+
+    El motor usa SELECT FOR UPDATE: seguro para uso concurrente.
+    """
+    org_id = itype.organization_id
+    seq_code = f"insp_{org_id}_{itype.id}"
+    seq_def = get_sequence_def_by_code(db, seq_code)
+
+    if seq_def:
+        db.expire_all()  # fuerza lectura fresca desde BD
+        company = db.get(Company, company_id)
+        company_code = (
+            company.company_code
+            or (company.nombre_comercial or company.razon_social or "EMP")[:3].upper()
+        ) if company else "EMP"
+
+        type_code = itype.type_code or ""
+
+        return SequenceEngine.next(
+            db=db,
+            code=seq_code,
+            context={
+                "company_code": company_code,
+                "type_code":    type_code,
+            },
+            scope={
+                "organization": org_id,
+                "company":      company_id,
+            },
+        )
+
+    # Fallback: tipo sin secuencia configurada (no tiene type_code)
+    return f"INSP-{itype.id}-{company_id}"
 def get_company_signers(db, company_id):
     return db.execute(select(CompanySigners).where(
         CompanySigners.company_id == company_id)).scalar_one_or_none()
@@ -445,4 +634,3 @@ def upsert_company_signers(db, company_id: int, data: dict):
     db.commit()
     db.refresh(signers)
     return signers
-

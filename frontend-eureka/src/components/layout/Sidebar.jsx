@@ -1,9 +1,9 @@
-import React from "react";
+import React,{useState} from "react";
 import { NavLink } from "react-router-dom";
-import { X } from "lucide-react";
+import { X,ChevronDown } from "lucide-react";
 import { getMenuForUser } from "../../config/menu";
 import { useAuth } from "../../contexts/AuthContext";
-
+import MenuItem from "../layout/MenuItem";
 const SidebarContent = ({ onNavigate }) => {
   const { hasPermission, user } = useAuth();
   const menu = getMenuForUser(hasPermission, user);
@@ -43,7 +43,15 @@ const SidebarContent = ({ onNavigate }) => {
               </div>
             );
           }
-
+          if (item.children?.length > 0) {
+            return (
+            <MenuItem
+            key={item.label}
+            item={item}
+            onNavigate={onNavigate}
+            />
+          );
+        }
           return (
             <NavLink
               key={item.path}

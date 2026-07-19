@@ -67,6 +67,8 @@ def require_permission(*required_codes: str):
     """
 
     def checker(current_user: User = Depends(get_current_active_user)) -> User:
+        if current_user.is_platform_admin:
+            return current_user
         user_codes = {p.code for p in current_user.role.permissions}
 
         if not (user_codes & set(required_codes)):

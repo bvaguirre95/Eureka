@@ -39,6 +39,7 @@ class InspectionTypeFieldOut(InspectionTypeFieldBase):
 
 class InspectionTypeCreate(BaseModel):
     name: str
+    type_code: Optional[str] = None   # "EXT" | "EPP" — usado por el motor de secuencias
     description: Optional[str] = None
     icon: Optional[str] = None
     periodicity: Optional[str] = None
@@ -49,6 +50,7 @@ class InspectionTypeCreate(BaseModel):
 
 class InspectionTypeUpdate(BaseModel):
     name: Optional[str] = None
+    type_code: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
     periodicity: Optional[str] = None
@@ -61,6 +63,7 @@ class InspectionTypeOut(BaseModel):
     id: int
     organization_id: int
     name: str
+    type_code: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
     periodicity: Optional[str] = None
@@ -129,18 +132,20 @@ class CorrectiveActionCreate(BaseModel):
     description: str
     action: Optional[str] = None
     priority: Optional[str] = None     # "A" | "B" | "C"
+    responsible_name: Optional[str] = None   # nombre libre
+    responsible_id: Optional[int] = None     # usuario del sistema (opcional)
     due_date_start: Optional[datetime] = None
     due_date_end: Optional[datetime] = None
-    responsible_id: Optional[int] = None
 
 
 class CorrectiveActionUpdate(BaseModel):
     description: Optional[str] = None
     action: Optional[str] = None
     priority: Optional[str] = None
+    responsible_name: Optional[str] = None
+    responsible_id: Optional[int] = None
     due_date_start: Optional[datetime] = None
     due_date_end: Optional[datetime] = None
-    responsible_id: Optional[int] = None
     status: Optional[ActionStatusEnum] = None
     completion_notes: Optional[str] = None
 
@@ -274,6 +279,28 @@ class InspectionTypeStat(BaseModel):
     semaforo: str   # "green" | "yellow" | "red"
 
 
+class ActionSummary(BaseModel):
+    """Resumen de una acción correctiva para el dashboard."""
+    id: int
+    inspection_id: int
+    inspection_number: Optional[str]
+    inspection_type: str
+    description: str
+    responsible_name: Optional[str]
+    due_date_end: Optional[datetime]
+    status: str
+    priority: Optional[str]
+    days_overdue: Optional[int]  # días vencida (negativo = días restantes)
+
+
+class WeeklyStats(BaseModel):
+    """Estadísticas de la semana actual."""
+    inspections_this_week: int
+    completed_this_week: int
+    actions_created_this_week: int
+    actions_completed_this_week: int
+
+
 class InspectionDashboard(BaseModel):
     total: int
     borrador: int
@@ -284,3 +311,7 @@ class InspectionDashboard(BaseModel):
     open_actions: int
     overdue_actions: int
     by_type: List[InspectionTypeStat]
+    # Nuevos campos
+    weekly: Optional[WeeklyStats] = None
+    actions_overdue: List[ActionSummary] = []    # acciones ya vencidas
+    actions_due_soon: List[ActionSummary] = []   # vencen en los próximos 7 días

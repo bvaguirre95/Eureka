@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Badge } from "../components/ui/badge";
-import api from "../services/api";
+import api, { BACKEND_URL } from "../services/api";
 import { LoginForm } from "../components/auth/LoginForm";
 import {
   Shield,
@@ -33,6 +33,130 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import Swal from "sweetalert2";
+
+
+// ── Carrusel de clientes ──────────────────────────────────────────────────────
+const ClientCarousel = ({ clients }) => {
+  const [current, setCurrent] = React.useState(0);
+  const [paused, setPaused] = React.useState(false);
+  const VISIBLE = 5; // tarjetas visibles simultáneamente en desktop
+  const total = clients.length;
+
+  // Auto-avance cada 3 s salvo que el usuario esté interactuando
+  React.useEffect(() => {
+    if (paused || total <= VISIBLE) return;
+    const id = setInterval(() => setCurrent((c) => (c + 1) % total), 3000);
+    return () => clearInterval(id);
+  }, [paused, total]);
+
+  const prev = () => setCurrent((c) => (c - 1 + total) % total);
+  const next = () => setCurrent((c) => (c + 1) % total);
+
+  // Construir la lista circular de índices visibles
+  const visibleIndices = Array.from({ length: Math.min(VISIBLE, total) }, (_, i) =>
+    (current + i) % total
+  );
+
+  const ClientCard = ({ client }) => {
+    const display = client.nombre_comercial || client.razon_social;
+    const initials = display
+      .split(" ")
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase();
+    const [logoError, setLogoError] = React.useState(false);
+    const showLogo = client.has_logo && !logoError;
+
+    return (
+      <div className="flex-shrink-0 w-40 sm:w-48 bg-white border border-gray-100 rounded-xl p-4 flex flex-col items-center text-center shadow-sm hover:shadow-md hover:border-green-200 transition-all duration-200 mx-2">
+        {showLogo ? (
+          <img
+            src={`${BACKEND_URL}/api/v1/public/companies/${client.id}/logo`}
+            alt={display}
+            className="w-14 h-14 object-contain rounded-lg mb-3"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-green-500 to-emerald-700 flex items-center justify-center text-white font-bold text-lg mb-3 flex-shrink-0">
+            {initials}
+          </div>
+        )}
+        <p className="font-semibold text-gray-900 text-xs leading-snug line-clamp-2">
+          {display}
+        </p>
+        {client.industria && (
+          <p className="text-xs text-gray-400 mt-1 capitalize truncate w-full">
+            {client.industria}
+          </p>
+        )}
+        {client.ciudad && (
+          <p className="text-xs text-green-600 mt-0.5 truncate w-full">
+            {client.ciudad}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  // Si caben todos sin scroll, mostrar grid simple
+  if (total <= VISIBLE) {
+    return (
+      <div className="flex flex-wrap justify-center gap-4">
+        {clients.map((c) => <ClientCard key={c.id} client={c} />)}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* Flecha izquierda */}
+      <button
+        onClick={prev}
+        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow hover:bg-green-50 hover:border-green-400 transition-all"
+        aria-label="Anterior"
+      >
+        <ChevronLeft className="w-5 h-5 text-gray-600" />
+      </button>
+
+      {/* Pista */}
+      <div className="overflow-hidden mx-8">
+        <div className="flex justify-center transition-all duration-500">
+          {visibleIndices.map((idx) => (
+            <ClientCard key={`${idx}-${clients[idx].id}`} client={clients[idx]} />
+          ))}
+        </div>
+      </div>
+
+      {/* Flecha derecha */}
+      <button
+        onClick={next}
+        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow hover:bg-green-50 hover:border-green-400 transition-all"
+        aria-label="Siguiente"
+      >
+        <ChevronRight className="w-5 h-5 text-gray-600" />
+      </button>
+
+      {/* Indicadores de puntos */}
+      <div className="flex justify-center gap-1.5 mt-6">
+        {clients.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(i)}
+            className={`w-2 h-2 rounded-full transition-all ${
+              i === current ? "bg-green-600 w-4" : "bg-gray-300 hover:bg-gray-400"
+            }`}
+            aria-label={`Ir a cliente ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const LandingPage = () => {
   const [contactForm, setContactForm] = useState({
@@ -134,14 +258,13 @@ const LandingPage = () => {
   // Cargar clientes
   useEffect(() => {
     loadClients();
-    loadServiceGalleries();
   }, []);
 
   const loadClients = async () => {
     try {
       setLoadingClients(true);
-      const response = await api.get("/clients/nuestros");
-      setClients(response.data.slice(0, 8)); // Mostrar solo 8 clientes
+      const response = await api.get("/api/v1/public/companies?org_slug=eureka&limit=12");
+      setClients(response.data);
     } catch (error) {
       console.error("Error loading clients:", error);
     } finally {
@@ -149,31 +272,7 @@ const LandingPage = () => {
     }
   };
 
-  const loadServiceGalleries = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/services/public/all");
 
-      const galleries = {};
-      response.data.forEach((gallery) => {
-        if (!galleries[gallery.service_id]) {
-          galleries[gallery.service_id] = [];
-        }
-        galleries[gallery.service_id].push(gallery);
-      });
-
-      // Ordenar por orden definido en la BD
-      Object.keys(galleries).forEach((key) => {
-        galleries[key].sort((a, b) => a.order - b.order);
-      });
-
-      setServiceGalleries(galleries);
-    } catch (error) {
-      console.error("Error loading galleries:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleContactSubmit = async (e) => {
     e.preventDefault();
@@ -509,10 +608,10 @@ const ServiceGalleryModal = ({ service, images, onClose }) => {
         )}
       </section>
 
-      {/* Clientes Section */}
-      <section id="clientes" className="py-12 sm:py-20 bg-white">
+      {/* Clientes Section — Carrusel */}
+      <section id="clientes" className="py-12 sm:py-20 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
+          <div className="text-center mb-10 sm:mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               Nuestros Clientes
             </h2>
@@ -527,30 +626,10 @@ const ServiceGalleryModal = ({ service, images, onClose }) => {
             </div>
           ) : clients.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-600">No hay clientes para mostrar</p>
+              <p className="text-gray-600">No hay clientes registrados</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-              {clients.map((client) => (
-                <div
-                  key={client._id}
-                  className="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 text-center border-l-4 border-green-600"
-                >
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white font-bold text-xl">
-                    {client.logo}
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-lg mb-1">
-                    {client.company_name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {client.contact_person}
-                  </p>
-                  <p className="text-xs text-gray-500 capitalize">
-                    {client.industry}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <ClientCarousel clients={clients} />
           )}
         </div>
       </section>

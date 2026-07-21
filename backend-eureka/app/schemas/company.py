@@ -18,6 +18,7 @@ class CompanyBase(BaseModel):
     telefono: Optional[str] = None
     email_contacto: Optional[EmailStr] = None
     is_active: Optional[bool] = None
+    show_on_website: Optional[bool] = None
     descripcion: Optional[str] = None
     intro_inspeccion: Optional[str] = None
     geritra_config: Optional[dict] = None
@@ -59,6 +60,7 @@ class CompanyUpdate(BaseModel):
     intro_inspeccion: Optional[str] = None
     geritra_config: Optional[dict] = None
     is_active: Optional[bool] = None
+    show_on_website: Optional[bool] = None
 
 
 class CompanyOut(CompanyBase):

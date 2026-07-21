@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import Swal from "sweetalert2";
-import { Download, Eye, Loader, RefreshCw, ThumbsDown, ThumbsUp, Upload } from "lucide-react";
+import { Download, Eye, Loader, Mail, RefreshCw, ThumbsDown, ThumbsUp, Upload } from "lucide-react";
 import documentService from "../../services/document.service";
 import { STATUS_CONFIG } from "./documentStatus";
 import { DocumentPreviewModal } from "./DocumentPreviewModal";
@@ -19,6 +19,7 @@ export const DocumentRow = ({ row, companyId, canUpload, canValidate, canReplace
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [resending, setResending] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [previewBlob, setPreviewBlob] = useState(null);
 
@@ -159,6 +160,33 @@ export const DocumentRow = ({ row, companyId, canUpload, canValidate, canReplace
     }
   };
 
+  const handleResendEmail = async () => {
+    const result = await Swal.fire({
+      icon: "question",
+      title: "¿Reenviar notificación?",
+      text: `Se enviará el correo de ${row.status === "validado" ? "aprobación" : "rechazo"} al email de contacto de la empresa.`,
+      showCancelButton: true,
+      confirmButtonText: "Reenviar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#16a34a",
+    });
+    if (!result.isConfirmed) return;
+    setResending(true);
+    try {
+      await documentService.resendValidationEmail(companyId, row.company_document_id);
+      Swal.fire({ icon: "success", title: "Email reenviado", timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo reenviar",
+        text: err.response?.data?.detail || "Intenta nuevamente",
+        confirmButtonColor: "#16a34a",
+      });
+    } finally {
+      setResending(false);
+    }
+  };
+
   const dueDateLabel = formatDate(row.due_date);
   const isOverdue =
     row.due_date && new Date(row.due_date) < new Date() && row.status !== "validado";
@@ -268,6 +296,18 @@ export const DocumentRow = ({ row, companyId, canUpload, canValidate, canReplace
                 <ThumbsDown className="w-4 h-4" />
               </button>
             </>
+          )}
+
+          {canValidate && (row.status === "validado" || row.status === "rechazado") && row.company_document_id && (
+            <button
+              onClick={handleResendEmail}
+              disabled={resending}
+              className="p-2 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors disabled:opacity-50"
+              title="Reenviar notificación por email"
+              aria-label="Reenviar email"
+            >
+              {resending ? <Loader className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+            </button>
           )}
         </div>
 

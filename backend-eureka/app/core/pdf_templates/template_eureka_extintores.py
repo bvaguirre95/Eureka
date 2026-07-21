@@ -579,11 +579,9 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
 
 <!-- ══ CUERPO DEL INFORME ══ -->
 
-
-
 <h2 class="sec">1. Introducción</h2>
 <p><strong>{company_rs}</strong> {comp_desc}</p>
-<p>{comp_intr}</p>
+<p>Durante el desarrollo de la presente inspección se tomarán en cuenta diversos aspectos que influyen en el funcionamiento seguro del establecimiento; para ello, se elaborará una lista de chequeo que permitirá conocer el estado de los extintores, su correcta clasificación de acuerdo con el área donde se encuentran ubicados y el cumplimiento de la normativa vigente. Posteriormente, se comunicarán al responsable las condiciones identificadas, con el fin de establecer medidas preventivas y/o correctivas que garanticen la seguridad de los trabajadores, clientes e instalaciones.</p>
 <h2 class="sec">2. Objetivos</h2>
 <h3 class="sub">2.1 Objetivo general</h3>
 <p>Evaluar el estado y las condiciones en las que se encuentran los extintores de <strong>{company_rs}</strong>, por medio de una inspección técnica utilizando el formato de check list para proponer medidas preventivas y correctivas que minimicen los peligros y riesgos.</p>

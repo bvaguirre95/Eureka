@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     # ==========================
     BACKEND_CORS_ORIGINS: Union[str, List[str]]
 
+    MAIL_FROM: str
+    MAIL_FROM_NAME: str = "Eureka SST"
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_SERVER: str
+    MAIL_PORT: int = 465
+    
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def split_cors_origins(cls, value):

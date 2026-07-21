@@ -1,11 +1,13 @@
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_permission
+from app.core.email_service import build_validation_email, send_email
+from app.core.config import settings
 from app.crud import company as crud_company
 from app.crud import company_document as crud_doc
 from app.crud import document_catalog as crud_catalog
@@ -40,7 +42,6 @@ def _check_company_access(db: Session, current_user: User, company_id: int):
 
 
 def _period_year(period_label: Optional[str]) -> Optional[int]:
-    """Extrae el año de un period_label tipo '2026', '2026-01' o '2026-B1'."""
     if not period_label:
         return None
     try:
@@ -49,18 +50,55 @@ def _period_year(period_label: Optional[str]) -> Optional[int]:
         return None
 
 
+def _send_notification(
+    *,
+    to_email: Optional[str],
+    to_name: str,
+    company_name: str,
+    document_name: str,
+    period_display: str,
+    validator_name: str,
+    validator_email: Optional[str],
+    approved: bool,
+    rejection_reason: Optional[str],
+) -> None:
+    """Envía email en background. No lanza excepción."""
+    if not to_email:
+        return
+    if not settings.MAIL_FROM:
+        print("[email] MAIL_FROM no configurado — email omitido")
+        return
+
+    subject, html_body = build_validation_email(
+        to_name=to_name,
+        company_name=company_name,
+        document_name=document_name,
+        period_display=period_display,
+        validator_name=validator_name,
+        approved=approved,
+        rejection_reason=rejection_reason,
+    )
+    send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+        sender_name=validator_name,
+        reply_to=validator_email,   # el destinatario puede responder directo al validador
+    )
+
+
+# ── GET matriz ────────────────────────────────────────────────────────────────
+
 @router.get("/", response_model=list[DocumentMatrixItem])
 def get_documents_matrix(
     company_id: int,
-    year: Optional[int] = Query(None, description="Año a consultar (por defecto, el actual)"),
+    year: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents.view")),
 ):
     _check_company_access(db, current_user, company_id)
     company = _get_company_or_404(db, company_id)
 
-    # Rol "Empresa": solo puede ver documentos validados.
-    # Se detecta por la ausencia del permiso "documents.upload".
     user_codes = {p.code for p in current_user.role.permissions}
     only_validated = (
         "documents.upload" not in user_codes
@@ -68,6 +106,8 @@ def get_documents_matrix(
     )
     return crud_doc.get_document_matrix(db, company, year=year, only_validated=only_validated)
 
+
+# ── GET resumen ───────────────────────────────────────────────────────────────
 
 @router.get("/summary", response_model=CompanyDocumentSummary)
 def get_documents_summary(
@@ -80,6 +120,8 @@ def get_documents_summary(
     company = _get_company_or_404(db, company_id)
     return crud_doc.get_company_document_summary(db, company, year=year)
 
+
+# ── POST upload ───────────────────────────────────────────────────────────────
 
 @router.post("/upload", response_model=DocumentMatrixItem, status_code=status.HTTP_201_CREATED)
 async def upload_document(
@@ -140,7 +182,6 @@ async def upload_document(
         if row.catalog_item_id == catalog_item.id and row.period_label == period_label:
             return row
 
-    # Fallback (no debería ocurrir): construir manualmente
     return DocumentMatrixItem(
         catalog_item_id=catalog_item.id,
         code=catalog_item.code,
@@ -158,11 +199,14 @@ async def upload_document(
     )
 
 
+# ── POST validate ─────────────────────────────────────────────────────────────
+
 @router.post("/{document_id}/validate", response_model=DocumentMatrixItem)
 def validate_document(
     company_id: int,
     document_id: int,
     payload: DocumentValidationRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents.validate")),
 ):
@@ -178,15 +222,116 @@ def validate_document(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
+    # ── Lógica de destinatario según resultado ──────────────────────────────
+    # APROBADO → email a la empresa (correo de contacto)
+    # RECHAZADO → email al técnico que subió el documento
+    if payload.approve:
+        to_email = company.email_contacto
+        to_name  = company.razon_social
+    else:
+        uploader = document.uploaded_by
+        to_email = uploader.email    if uploader else None
+        to_name  = uploader.full_name if uploader else "Técnico"
+
+    background_tasks.add_task(
+        _send_notification,
+        to_email=to_email,
+        to_name=to_name,
+        company_name=company.razon_social,
+        document_name=document.catalog_item.name if document.catalog_item else "Documento",
+        period_display=document.period_label or "Único",
+        validator_name=current_user.full_name,
+        validator_email=current_user.email,
+        approved=payload.approve,
+        rejection_reason=payload.reason,
+    )
+
     matrix = crud_doc.get_document_matrix(db, company, year=_period_year(document.period_label))
     for row in matrix:
         if row.company_document_id == document.id:
             return row
 
     raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo reconstruir el estado"
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="No se pudo reconstruir el estado",
     )
 
+
+# ── POST resend email ─────────────────────────────────────────────────────────
+
+@router.post("/{document_id}/resend-email", status_code=status.HTTP_200_OK)
+def resend_validation_email(
+    company_id: int,
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.validate")),
+):
+    """
+    Reenvía el email de notificación del último estado (VALIDADO → empresa,
+    RECHAZADO → técnico que subió el documento).
+    """
+    _check_company_access(db, current_user, company_id)
+    company = _get_company_or_404(db, company_id)
+
+    document = crud_doc.get_company_document(db, document_id)
+    if not document or document.company_id != company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+    if document.status not in (DocumentStatusEnum.VALIDADO, DocumentStatusEnum.RECHAZADO):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se puede reenviar para documentos validados o rechazados",
+        )
+
+    approved = document.status == DocumentStatusEnum.VALIDADO
+
+    if approved:
+        if not company.email_contacto:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Esta empresa no tiene email de contacto configurado",
+            )
+        to_email = company.email_contacto
+        to_name  = company.razon_social
+    else:
+        uploader = document.uploaded_by
+        if not uploader:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se encontró el técnico que subió el documento",
+            )
+        to_email = uploader.email
+        to_name  = uploader.full_name
+
+    validator_name = (
+        document.validated_by.full_name if document.validated_by else current_user.full_name
+    )
+
+    validator_email = (
+        document.validated_by.email if document.validated_by else current_user.email
+    )
+    background_tasks.add_task(
+        _send_notification,
+        to_email=to_email,
+        to_name=to_name,
+        company_name=company.razon_social,
+        document_name=document.catalog_item.name if document.catalog_item else "Documento",
+        period_display=document.period_label or "Único",
+        validator_name=validator_name,
+        validator_email=validator_email,
+        approved=approved,
+        rejection_reason=document.rejection_reason,
+    )
+
+    return {
+        "message": f"Email reenviado a {to_email}",
+        "document_id": document_id,
+        "status": document.status,
+    }
+
+
+# ── GET download ──────────────────────────────────────────────────────────────
 
 @router.get("/{document_id}/download")
 def download_document(
@@ -209,6 +354,8 @@ def download_document(
         filename=document.original_filename or os.path.basename(document.file_path),
     )
 
+
+# ── DELETE ────────────────────────────────────────────────────────────────────
 
 @router.delete("/{document_id}", response_model=DocumentMatrixItem)
 def delete_document_file(
@@ -237,5 +384,6 @@ def delete_document_file(
             return row
 
     raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo reconstruir el estado"
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="No se pudo reconstruir el estado",
     )

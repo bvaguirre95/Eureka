@@ -47,6 +47,7 @@ class Organization(Base):
     users = relationship("User", back_populates="organization")
     companies = relationship("Company", back_populates="organization")
     roles = relationship("Role", back_populates="organization")
+    slug = Column(String(100), unique=True, nullable=True, index=True)
     catalog_items = relationship("DocumentCatalogItem", back_populates="organization")
 
     def __repr__(self) -> str:

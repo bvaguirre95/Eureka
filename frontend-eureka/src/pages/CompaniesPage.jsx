@@ -6,7 +6,7 @@ import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import companyService from "../services/company.service";
 import { CompanyFormModal } from "../components/companies/CompanyFormModal";
-
+import { CompanyLogo } from "../components/companies/CompanyLogo";
 export const CompaniesPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
@@ -104,14 +104,12 @@ export const CompaniesPage = () => {
 
               {/* Empresa */}
               <div className="col-span-5 flex items-center gap-3 min-w-0">
-                {company.logo_url ? (
-                  <img src={company.logo_url} alt=""
-                    className="w-9 h-9 rounded-lg object-contain border border-gray-100 flex-shrink-0" />
-                ) : (
-                  <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-                    <Building2 className="w-4 h-4 text-green-500" />
-                  </div>
-                )}
+                <CompanyLogo
+                companyId={company.id}
+                hasLogo={company.has_logo}
+                size={36}
+                className="border border-gray-100 flex-shrink-0"
+                />
                 <div className="min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">
                     {company.razon_social}

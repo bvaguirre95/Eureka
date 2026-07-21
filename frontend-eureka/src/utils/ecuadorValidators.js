@@ -49,25 +49,39 @@ export const isValidRuc = (value) => {
   const digits = value.split("").map(Number);
   const third = digits[2];
 
+  // Persona natural
   if (third <= 5) {
     const coef = [2, 1, 2, 1, 2, 1, 2, 1, 2];
-    const expected = checkDigitMod10(digits.slice(0, 9), coef);
+
+    const expected = checkDigitMod10(
+      digits.slice(0, 9),
+      coef
+    );
+
     if (expected !== digits[9]) return false;
+
     return value.slice(10, 13) !== "000";
   }
 
+  // Entidad pública
   if (third === 6) {
     const coef = [2, 3, 4, 5, 6, 7, 2, 3];
-    const expected = checkDigitMod11(digits.slice(0, 8), coef);
-    if (expected === 10 || expected !== digits[8]) return false;
+
+    const expected = checkDigitMod11(
+      digits.slice(0, 8),
+      coef
+    );
+
+    if (expected === 10 || expected !== digits[8]) {
+      return false;
+    }
+
     return value.slice(9, 13) !== "0000";
   }
 
+  // Sociedad privada
   if (third === 9) {
-    const coef = [2, 3, 4, 5, 6, 7, 2, 3, 4];
-    const expected = checkDigitMod11(digits.slice(0, 9), coef);
-    if (expected === 10 || expected !== digits[9]) return false;
-    return value.slice(10, 13) !== "000";
+    return value.slice(10, 13) === "001";
   }
 
   return false;

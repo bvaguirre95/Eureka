@@ -63,6 +63,17 @@ const deleteDocumentFile = async (companyId, documentId) => {
   return response.data;
 };
 
+/**
+ * Reenvía el email de notificación del último estado de validación
+ * al correo de contacto de la empresa.
+ */
+const resendValidationEmail = async (companyId, documentId) => {
+  const response = await api.post(
+    `${companyDocsPrefix(companyId)}/${documentId}/resend-email`
+  );
+  return response.data;
+};
+
 // ---------------------------------------------------------------------------
 // Catálogo normativo (admin)
 // ---------------------------------------------------------------------------
@@ -125,6 +136,7 @@ const documentService = {
   getSummary,
   uploadDocument,
   validateDocument,
+  resendValidationEmail,
   getDownloadUrl,
   downloadDocument,
   deleteDocumentFile,

@@ -1,16 +1,7 @@
 """
 Validadores de cédula y RUC para Ecuador, según los algoritmos oficiales
 del SRI (Servicio de Rentas Internas).
-
-Tipos de RUC según el tercer dígito:
-- 0-5: Persona natural        -> cédula (mod 10) + establecimiento "001".."999"
-- 6:   Entidad pública         -> mod 11 (8 dígitos) + establecimiento "0001".."9999"
-- 9:   Sociedad privada/jurídica -> mod 11 (9 dígitos) + establecimiento "001".."999"
-
-Los dos primeros dígitos corresponden al código de provincia (01-24), o
-30 para contribuyentes especiales/no domiciliados.
 """
-
 
 def _check_digit_mod10(digits: list[int], coefficients: list[int]) -> int:
     """Algoritmo módulo 10, usado para cédulas y RUC de persona natural."""
@@ -25,10 +16,21 @@ def _check_digit_mod10(digits: list[int], coefficients: list[int]) -> int:
 
 
 def _check_digit_mod11(digits: list[int], coefficients: list[int]) -> int:
-    """Algoritmo módulo 11, usado para RUC de sociedades y entidades públicas."""
+    """Algoritmo módulo 11 para RUC de sociedades y entidades públicas."""
     total = sum(d * c for d, c in zip(digits, coefficients))
     remainder = total % 11
-    return 0 if remainder == 0 else 11 - remainder
+    
+    # Si el residuo es 0, el dígito verificador es 0
+    if remainder == 0:
+        return 0
+        
+    result = 11 - remainder
+    
+    # CORRECCIÓN SRI: Si el resultado es 10, el dígito verificador oficial es 0
+    if result == 10:
+        return 0
+        
+    return result
 
 
 def _valid_province(value: str) -> bool:
@@ -44,7 +46,7 @@ def is_valid_cedula(value: str) -> bool:
         return False
 
     digits = [int(c) for c in value]
-    if digits[2] > 5:  # el tercer dígito debe ser 0-5 para personas naturales
+    if digits[2] > 5:  # El tercer dígito debe ser 0-5 para personas naturales
         return False
 
     coef = [2, 1, 2, 1, 2, 1, 2, 1, 2]
@@ -53,40 +55,52 @@ def is_valid_cedula(value: str) -> bool:
 
 
 def is_valid_ruc(value: str) -> bool:
-    """
-    Valida un RUC ecuatoriano (13 dígitos): persona natural, sociedad
-    privada o entidad pública.
-    """
+    """Valida un RUC ecuatoriano de 13 dígitos."""
     if not value.isdigit() or len(value) != 13:
         return False
+
     if not _valid_province(value):
         return False
 
     digits = [int(c) for c in value]
     third = digits[2]
 
+    # ─────────────────────────────────────────
+    # Persona natural
+    # ─────────────────────────────────────────
     if third <= 5:
-        # Persona natural: cédula (10 dígitos) + establecimiento "001".."999"
         coef = [2, 1, 2, 1, 2, 1, 2, 1, 2]
         expected = _check_digit_mod10(digits[:9], coef)
+        
         if expected != digits[9]:
             return False
         return value[10:13] != "000"
 
+    # ─────────────────────────────────────────
+    # Entidad pública
+    # ─────────────────────────────────────────
     if third == 6:
-        # Entidad pública: 8 dígitos + dígito verificador + estab. "0001".."9999"
-        coef = [2, 3, 4, 5, 6, 7, 2, 3]
+        coef = [3, 2, 7, 6, 5, 4, 3, 2]
         expected = _check_digit_mod11(digits[:8], coef)
-        if expected == 10 or expected != digits[8]:
+
+        # CORRECCIÓN: Se eliminó "expected >= 10"
+        if expected != digits[8]:
             return False
         return value[9:13] != "0000"
 
+    # ─────────────────────────────────────────
+    # Sociedad privada
+    # ─────────────────────────────────────────
     if third == 9:
-        # Sociedad privada: 9 dígitos + dígito verificador + estab. "001".."999"
-        coef = [2, 3, 4, 5, 6, 7, 2, 3, 4]
+        coef = [4, 3, 2, 7, 6, 5, 4, 3, 2]
         expected = _check_digit_mod11(digits[:9], coef)
-        if expected == 10 or expected != digits[9]:
+
+        # CORRECCIÓN: Se eliminó "expected >= 10"
+        if expected != digits[9]:
             return False
         return value[10:13] != "000"
 
     return False
+
+# Prueba con el RUC de tu duda anterior (Retorna True exitosamente)
+print(is_valid_ruc("0791823595001")) 

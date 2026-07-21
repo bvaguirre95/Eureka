@@ -158,7 +158,7 @@ def get_company_logo(
 def delete_company_logo(
     company_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("companies.edit")),
+    current_user: User = Depends(require_permission("companies.delete")),
 ):
     if not crud_company.user_has_access_to_company(db, current_user, company_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso a esta empresa")

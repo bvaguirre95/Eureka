@@ -40,7 +40,7 @@ class Company(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-
+    show_on_website = Column(Boolean, default=False,nullable=True)
     organization = relationship("Organization", back_populates="companies")
     user_links = relationship(
         "UserCompany", back_populates="company", cascade="all, delete-orphan"

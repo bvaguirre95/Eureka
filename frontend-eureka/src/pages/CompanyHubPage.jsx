@@ -53,6 +53,7 @@ export const CompanyHubPage = () => {
   const [loading, setLoading]     = useState(true);
   const [editOpen, setEditOpen]   = useState(false);
   const [logoKey, setLogoKey]     = useState(0);
+  const [logoUrl, setLogoUrl] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,10 +68,37 @@ export const CompanyHubPage = () => {
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+  let objectUrl = null;
+
+  const loadLogo = async () => {
+    if (!company?.has_logo) {
+      setLogoUrl(null);
+      return;
+    }
+
+    try {
+      const blob = await companyService.getLogo(companyId);
+
+      objectUrl = URL.createObjectURL(blob);
+      setLogoUrl(objectUrl);
+    } catch (error) {
+      console.error("Error cargando logo:", error);
+      setLogoUrl(null);
+    }
+  };
+
+  loadLogo();
+
+  return () => {
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+}, [companyId, company?.has_logo, logoKey]);
 
   const go = (path) => navigate(`/dashboard/empresas/${companyId}/${path}`);
 
-  const logoUrl = `/api/v1/companies/${companyId}/logo?t=${logoKey}`;
 
   if (loading) return (
     <DashboardLayout>
@@ -98,15 +126,18 @@ export const CompanyHubPage = () => {
         <div className="flex items-start gap-4">
           {/* Logo */}
           <div className="flex-shrink-0">
-            {company?.has_logo ? (
-              <img src={logoUrl} alt="Logo"
-                className="w-16 h-16 rounded-xl object-contain border border-gray-100"
-                onError={(e) => { e.target.style.display = "none"; }} />
-            ) : (
-              <div className="w-16 h-16 rounded-xl bg-green-50 flex items-center justify-center">
-                <Building2 className="w-8 h-8 text-green-600" />
-              </div>
-            )}
+            {company?.has_logo && logoUrl ? (
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="w-16 h-16 rounded-xl object-contain border border-gray-100"
+            onError={() => setLogoUrl(null)}
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-xl bg-green-50 flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-green-600" />
+          </div>
+        )}
           </div>
 
           {/* Info */}

@@ -188,6 +188,57 @@ const MiniActionForm = ({ recordId, recordIndex, onSave, onCancel }) => {
   );
 };
 
+
+// ── GeneralDataSection ────────────────────────────────────────────────────────
+// Sección de datos generales para structure_type = formulario | formulario_matriz
+
+const GeneralDataSection = ({ fields, values, onChange, disabled }) => {
+  if (!fields || fields.length === 0) return null;
+
+  const groups = {};
+  fields.forEach(f => {
+    const g = f.group_name || "";
+    groups[g] = groups[g] || [];
+    groups[g].push(f);
+  });
+
+  return (
+    <div className="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden mb-5">
+      <div className="px-5 py-3.5 bg-blue-50 border-b border-blue-100">
+        <p className="text-sm font-bold text-blue-800">Datos generales</p>
+        <p className="text-xs text-blue-500 mt-0.5">Información de cabecera de la inspección</p>
+      </div>
+      <div className="px-5 py-4 space-y-4">
+        {Object.entries(groups).map(([groupName, groupFields]) => (
+          <div key={groupName}>
+            {groupName && (
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 border-b border-gray-100 pb-1">
+                {groupName}
+              </p>
+            )}
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+              {groupFields.map(field => (
+                <div key={field.id} className={field.field_type === "observacion" ? "sm:col-span-2" : ""}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    {field.name}
+                    {field.is_required && <span className="text-red-500 ml-0.5">*</span>}
+                  </label>
+                  <FieldInput
+                    field={field}
+                    value={values[field.field_key] || ""}
+                    onChange={(val) => onChange(field.field_key, val)}
+                    disabled={disabled}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ── RecordCard ────────────────────────────────────────────────────────────────
 
 const RecordCard = ({ record, fields, index, onUpdate, onDelete, onPhotoChange,
@@ -543,14 +594,32 @@ export const InspectionFormPage = () => {
   const [activeTab, setActiveTab] = useState("registros");
   const pendingUpdates = useRef({});
   const saveTimer = useRef(null);
+  const generalSaveTimer = useRef(null);
+  const [generalData, setGeneralData] = useState({});
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setInsp(await inspectionService.get(companyId, inspectionId)); }
+    try {
+      const data = await inspectionService.get(companyId, inspectionId);
+      setInsp(data);
+      setGeneralData(data.general_data || {});
+    }
     catch { /**/ } finally { setLoading(false); }
   }, [companyId, inspectionId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleGeneralDataChange = (fieldKey, value) => {
+    const next = { ...generalData, [fieldKey]: value };
+    setGeneralData(next);
+    // Guardar con debounce
+    if (generalSaveTimer.current) clearTimeout(generalSaveTimer.current);
+    generalSaveTimer.current = setTimeout(async () => {
+      try {
+        await inspectionService.update(companyId, inspectionId, { general_data: next });
+      } catch { /**/ }
+    }, 1000);
+  };
 
   const scheduleSave = (recordId, values, hasFinding) => {
     pendingUpdates.current[recordId] = { values, hasFinding };
@@ -714,18 +783,38 @@ export const InspectionFormPage = () => {
                 <CheckCircle2 className="w-4 h-4 mr-1.5" /> Cerrar inspección
               </Button>
             )}
-            <Button onClick={() => inspectionService.downloadPdf(companyId, inspectionId,
-                `Matriz_${insp.inspection_type_name.replace(/ /g,"_")}_N${insp.inspection_number||inspectionId}.pdf`,
-                "matriz")}
-              variant="outline" className="text-sm">
-              <Download className="w-4 h-4 mr-1.5" /> Matriz
-            </Button>
-            <Button onClick={() => inspectionService.downloadPdf(companyId, inspectionId,
-                `Informe_${insp.inspection_type_name.replace(/ /g,"_")}_N${insp.inspection_number||inspectionId}.pdf`,
-                "informe")}
-              variant="outline" className="text-sm">
-              <Download className="w-4 h-4 mr-1.5" /> Informe
-            </Button>
+            {/* Botones PDF — adaptados al structure_type, con fallback a "matriz" */}
+            {(() => {
+              const st = insp.structure_type || "matriz";
+              const nombre = insp.inspection_type_name.replace(/ /g,"_");
+              const num    = insp.inspection_number || inspectionId;
+              const dl = (doc, label) => inspectionService.downloadPdf(
+                companyId, inspectionId,
+                `${doc === "matriz" ? "Matriz" : "Informe"}_${nombre}_N${num}.pdf`,
+                doc
+              );
+              if (st === "formulario") return (
+                <Button onClick={() => dl("ambos","PDF")} variant="outline" className="text-sm">
+                  <Download className="w-4 h-4 mr-1.5" /> Descargar PDF
+                </Button>
+              );
+              if (st === "formulario_matriz") return (
+                <>
+                  <Button onClick={() => dl("informe","Informe")} variant="outline" className="text-sm">
+                    <Download className="w-4 h-4 mr-1.5" /> Informe
+                  </Button>
+                  <Button onClick={() => dl("matriz","Matriz")} variant="outline" className="text-sm">
+                    <Download className="w-4 h-4 mr-1.5" /> Matriz
+                  </Button>
+                </>
+              );
+              // matriz (o NULL legacy)
+              return (
+                <Button onClick={() => dl("ambos","PDF")} variant="outline" className="text-sm">
+                  <Download className="w-4 h-4 mr-1.5" /> Descargar PDF
+                </Button>
+              );
+            })()}
           </div>
         </div>
 
@@ -787,35 +876,119 @@ export const InspectionFormPage = () => {
       {/* Tab: Registros */}
       {activeTab === "registros" && (
         <div className="space-y-4">
-          {insp.records.length === 0 && !isEditable && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
-              <p className="text-gray-400">Sin registros en esta inspección.</p>
-            </div>
-          )}
 
-          {insp.records.map((record, idx) => (
-            <RecordCard
-              key={record.id}
-              record={record}
-              fields={insp.inspection_type_fields}
-              index={idx + 1}
-              onUpdate={(id, vals, finding) => scheduleSave(id, vals, finding)}
-              onDelete={handleDeleteRecord}
-              onPhotoChange={handlePhotoChange}
-              onAddAction={handleAddAction}
-              companyId={companyId}
-              inspectionId={inspectionId}
+          {/* ── Datos generales (formulario | formulario_matriz) ── */}
+          {(insp.structure_type === "formulario" || insp.structure_type === "formulario_matriz") && (
+            <GeneralDataSection
+              fields={(insp.inspection_type_fields || []).filter(f => f.scope === "general")}
+              values={generalData}
+              onChange={handleGeneralDataChange}
               disabled={!isEditable}
-              existingActions={insp.actions}
             />
-          ))}
-
-          {isEditable && (
-            <button onClick={handleAddRecord}
-              className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-sm text-gray-400 hover:border-green-300 hover:text-green-600 transition-colors flex items-center justify-center gap-2">
-              <Plus className="w-5 h-5" /> Agregar registro
-            </button>
           )}
+
+          {/* ── Modo FORMULARIO: un único registro implícito ── */}
+          {insp.structure_type === "formulario" && (
+            <>
+              {insp.records.length === 0 && isEditable && (
+                <div className="text-center py-4">
+                  <button onClick={handleAddRecord}
+                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">
+                    Iniciar formulario
+                  </button>
+                </div>
+              )}
+              {insp.records.map((record) => (
+                <div key={record.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4">
+                    Respuestas del formulario
+                  </p>
+                  {(() => {
+                    const matrizFields = (insp.inspection_type_fields || []).filter(f => f.scope !== "general");
+                    const vals = {};
+                    record.values.forEach(v => { vals[v.field_id] = v.value || ""; });
+                    const groups = {};
+                    matrizFields.forEach(f => {
+                      const g = f.group_name || "";
+                      groups[g] = groups[g] || [];
+                      groups[g].push(f);
+                    });
+                    return Object.entries(groups).map(([groupName, groupFields]) => (
+                      <div key={groupName} className="mb-4">
+                        {groupName && (
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 border-b border-gray-100 pb-1">
+                            {groupName}
+                          </p>
+                        )}
+                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+                          {groupFields.map(field => (
+                            <div key={field.id} className={field.field_type === "observacion" ? "sm:col-span-2" : ""}>
+                              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                                {field.name}
+                                {field.is_required && <span className="text-red-500 ml-0.5">*</span>}
+                              </label>
+                              <FieldInput
+                                field={field}
+                                value={vals[field.id] || ""}
+                                onChange={(val) => {
+                                  const next = { ...vals, [field.id]: val };
+                                  const hasFinding = matrizFields.some(f => {
+                                    if (f.field_type === "check_sn") return next[f.id] === "N";
+                                    if (f.field_type === "check_bm") return next[f.id] === "M";
+                                    if (f.field_type === "check_sna") return next[f.id] === "N";
+                                    return false;
+                                  });
+                                  scheduleSave(record.id, next, hasFinding);
+                                }}
+                                disabled={!isEditable}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* ── Modo MATRIZ y FORMULARIO+MATRIZ: múltiples registros ── */}
+          {(insp.structure_type === "matriz" || insp.structure_type === "formulario_matriz") && (
+            <>
+              {insp.records.length === 0 && !isEditable && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                  <p className="text-gray-400">Sin registros en esta inspección.</p>
+                </div>
+              )}
+
+              {insp.records.map((record, idx) => (
+                <RecordCard
+                  key={record.id}
+                  record={record}
+                  fields={(insp.inspection_type_fields || []).filter(f => f.scope !== "general")}
+                  index={idx + 1}
+                  onUpdate={(id, vals, finding) => scheduleSave(id, vals, finding)}
+                  onDelete={handleDeleteRecord}
+                  onPhotoChange={handlePhotoChange}
+                  onAddAction={handleAddAction}
+                  companyId={companyId}
+                  inspectionId={inspectionId}
+                  disabled={!isEditable}
+                  existingActions={insp.actions}
+                />
+              ))}
+
+              {isEditable && (
+                <button onClick={handleAddRecord}
+                  className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-sm text-gray-400 hover:border-green-300 hover:text-green-600 transition-colors flex items-center justify-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  {insp.structure_type === "formulario_matriz" ? "Agregar ítem" : "Agregar registro"}
+                </button>
+              )}
+            </>
+          )}
+
         </div>
       )}
 

@@ -1,14 +1,6 @@
 """
 Servicio de email para Eureka SST.
 SMTP SSL (puerto 465) — compatible con hosting cPanel.
-
-Variables de entorno en .env:
-    MAIL_FROM=notificaciones@tudominio.com
-    MAIL_FROM_NAME=Eureka SST
-    MAIL_USERNAME=notificaciones@tudominio.com   # igual que MAIL_FROM en cPanel
-    MAIL_PASSWORD=tu_contraseña
-    MAIL_SERVER=mail.tudominio.com
-    MAIL_PORT=465
 """
 
 import smtplib

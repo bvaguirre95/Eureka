@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     MAIL_PASSWORD: str
     MAIL_SERVER: str
     MAIL_PORT: int = 465
+
     
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

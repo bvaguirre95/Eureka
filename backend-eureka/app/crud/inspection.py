@@ -6,9 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.inspection import (
-    ActionStatusEnum, CorrectiveAction, FieldTypeEnum,
+    ActionStatusEnum, CorrectiveAction, FieldTypeEnum, FieldScopeEnum,
     Inspection, InspectionFieldValue, InspectionRecord,
-    InspectionStatusEnum, InspectionType, InspectionTypeField,
+    InspectionStatusEnum, StructureTypeEnum, InspectionType, InspectionTypeField,
 )
 from app.schemas.inspection import (
     CorrectiveActionCreate, CorrectiveActionOut, CorrectiveActionUpdate,
@@ -67,6 +67,7 @@ def _to_record_out(record: InspectionRecord) -> InspectionRecordOut:
             field_key=v.field.field_key if v.field else "",
             field_name=v.field.name if v.field else "",
             field_type=v.field.field_type if v.field else "",
+            scope=v.field.scope if v.field else "matriz",
             value=v.value,
         )
         for v in sorted(record.values, key=lambda x: x.field.order if x.field else 0)
@@ -118,6 +119,7 @@ def _to_inspection_out(insp: Inspection) -> InspectionOut:
         inspection_type_id=insp.inspection_type_id,
         inspection_type_name=insp.inspection_type.name,
         inspection_type_fields=fields_out,
+        structure_type=insp.inspection_type.structure_type or StructureTypeEnum.MATRIZ,
         status=insp.status,
         inspection_number=insp.inspection_number,
         scheduled_date=insp.scheduled_date,
@@ -131,6 +133,7 @@ def _to_inspection_out(insp: Inspection) -> InspectionOut:
         assigned_to_id=insp.assigned_to_id,
         assigned_to_name=insp.assigned_to.full_name if insp.assigned_to else None,
         created_by_name=insp.created_by.full_name if insp.created_by else None,
+        general_data=insp.general_data or {},
         records=[_to_record_out(r) for r in insp.records],
         actions=[_to_action_out(a) for a in insp.actions],
         created_at=insp.created_at, **st,
@@ -143,6 +146,7 @@ def _to_list_item(insp: Inspection) -> InspectionListItem:
         id=insp.id, company_id=insp.company_id,
         inspection_type_id=insp.inspection_type_id,
         inspection_type_name=insp.inspection_type.name,
+        structure_type=insp.inspection_type.structure_type or StructureTypeEnum.MATRIZ,
         status=insp.status, inspection_number=insp.inspection_number,
         scheduled_date=insp.scheduled_date, completed_date=insp.completed_date,
         location=insp.location,
@@ -174,6 +178,14 @@ def get_inspection_type(db: Session, type_id: int) -> Optional[InspectionType]:
     return _load_type(db, type_id)
 
 
+def get_inspection_type_out(db: Session, type_id: int) -> Optional[InspectionTypeOut]:
+    """Retorna un InspectionType serializado como InspectionTypeOut."""
+    itype = _load_type(db, type_id)
+    if not itype:
+        return None
+    return InspectionTypeOut.model_validate(itype)
+
+
 def create_inspection_type(db: Session, org_id: int, user_id: int,
                             type_in: InspectionTypeCreate) -> InspectionTypeOut:
     # Normalizar type_code: mayúsculas, sin espacios, máx 20 chars
@@ -187,6 +199,7 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
         description=type_in.description, icon=type_in.icon,
         periodicity=type_in.periodicity, is_active=type_in.is_active,
         pdf_template=getattr(type_in, "pdf_template", "generico") or "generico",
+        structure_type=getattr(type_in, "structure_type", StructureTypeEnum.MATRIZ),
         created_by_id=user_id,
     )
     db.add(itype)
@@ -199,6 +212,7 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
             field_type=f.field_type, options=f.options,
             is_required=f.is_required, order=f.order or idx,
             group_name=f.group_name,
+            scope=getattr(f, "scope", FieldScopeEnum.MATRIZ),
         ))
 
     db.commit()
@@ -227,7 +241,7 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
 
 def update_inspection_type(db: Session, itype: InspectionType,
                             type_in) -> InspectionTypeOut:
-    for f in ["name", "description", "icon", "periodicity", "is_active", "pdf_template", "type_code"]:
+    for f in ["name", "description", "icon", "periodicity", "is_active", "pdf_template", "type_code", "structure_type"]:
         v = getattr(type_in, f, None)
         if v is not None:
             setattr(itype, f, v)
@@ -241,7 +255,8 @@ def update_inspection_type(db: Session, itype: InspectionType,
                 inspection_type_id=itype.id, name=f.name, field_key=key,
                 field_type=f.field_type, options=f.options,
                 is_required=f.is_required, order=f.order or idx,
-                group_name=f.group_name
+                group_name=f.group_name,
+                scope=getattr(f, "scope", FieldScopeEnum.MATRIZ),
             ))
     db.commit()
     t = _load_type(db, itype.id)
@@ -368,7 +383,7 @@ def update_inspection_meta(db: Session, inspection: Inspection,
         fields = [
             "status", "inspection_number", "scheduled_date", "completed_date",
             "assigned_to_id", "location", "start_time", "end_time",
-            "general_observations", "recommendations",
+            "general_observations", "recommendations", "general_data",
             "elaborated_by", "reviewed_by", "approved_by",
             "elaborated_role", "reviewed_role", "approved_role",
         ]

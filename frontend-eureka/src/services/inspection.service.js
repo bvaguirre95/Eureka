@@ -9,7 +9,7 @@ const getTypes       = (orgId, onlyActive = false) =>
 const createType     = (orgId, payload) => api.post(orgPrefix(orgId), payload).then(r => r.data);
 const updateType     = (orgId, id, p)   => api.put(`${orgPrefix(orgId)}/${id}`, p).then(r => r.data);
 const deactivateType = (orgId, id)      => api.delete(`${orgPrefix(orgId)}/${id}`).then(r => r.data);
-const getTemplates   = ()               => api.get("/api/v1/inspection-templates").then(r => r.data);
+const getTemplates   = ()               => api.get("/api/v1/pdf-templates").then(r => r.data);
 
 // ── Inspecciones ──────────────────────────────────────────────────────────────
 const list   = (cId)          => api.get(`${cmpPrefix(cId)}/`).then(r => r.data);
@@ -59,8 +59,40 @@ const downloadPdf = async (cId, id, filename, doc = "ambos") => {
 };
 const closeInspection = (cId, id) => api.post(`${cmpPrefix(cId)}/${id}/close`);
 
+// ── Plantillas de inspección ─────────────────────────────────────────────────
+const getInspectionTemplates = (params = {}) =>
+  api.get("/api/v1/inspection-templates", { params }).then(r => r.data);
+const getInspectionTemplate = (id) =>
+  api.get(`/api/v1/inspection-templates/${id}`).then(r => r.data);
+const createInspectionTemplate = (payload) =>
+  api.post("/api/v1/inspection-templates", payload).then(r => r.data);
+const updateInspectionTemplate = (id, payload) =>
+  api.put(`/api/v1/inspection-templates/${id}`, payload).then(r => r.data);
+const deleteInspectionTemplate = (id) =>
+  api.delete(`/api/v1/inspection-templates/${id}`);
+const copyInspectionTemplate = (id, payload = {}) =>
+  api.post(`/api/v1/inspection-templates/${id}/copy`, payload).then(r => r.data);
+const useInspectionTemplate = (id, payload = {}) =>
+  api.post(`/api/v1/inspection-templates/${id}/use`, payload).then(r => r.data);
+const createGlobalTemplate = (payload) =>
+  api.post("/api/v1/inspection-templates/global", payload).then(r => r.data);
+
+const analyzeExcel = (file) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return api.post("/api/v1/inspection-templates/import-excel/analyze", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  }).then(r => r.data);
+};
+const confirmExcelImport = (payload) =>
+  api.post("/api/v1/inspection-templates/import-excel/confirm", payload).then(r => r.data);
+
 const inspectionService = {
   getTypes, createType, updateType, deactivateType, getTemplates,
+  getInspectionTemplates, getInspectionTemplate,
+  createInspectionTemplate, updateInspectionTemplate, deleteInspectionTemplate,
+  copyInspectionTemplate, useInspectionTemplate, createGlobalTemplate,
+  analyzeExcel, confirmExcelImport,
   list, get, create, update, remove,
   addRecord, updateRecord, deleteRecord,
   uploadRecordPhoto, deleteRecordPhoto,

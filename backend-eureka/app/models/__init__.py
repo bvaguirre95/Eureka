@@ -25,6 +25,7 @@ from app.models.geritra import (  # noqa: F401
     RiskMatrix, RiskMatrixRow, RiskLevel, MatrixStatus,
     ControlType, ActionStatus
 )
+from app.models.inspection_template import InspectionTemplate, TemplateSourceEnum  # noqa: F401
 __all__ = [
     "Base", "Organization", "OrgTypeEnum",
     "Permission", "Role", "role_permissions",
@@ -39,5 +40,5 @@ __all__ = [
     "InspectionStatusEnum", "ActionStatusEnum", "FieldTypeEnum",
     "RiskCategory", "RiskFactorCatalog", "JobPosition",
     "RiskMatrix", "RiskMatrixRow", "RiskLevel", "MatrixStatus",
-    "ControlType", "ActionStatus"
+    "ControlType", "ActionStatus", "InspectionTemplate", "TemplateSourceEnum",
 ]

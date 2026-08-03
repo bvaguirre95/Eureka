@@ -25,7 +25,7 @@ from app.schemas.sequence import SequenceDefCreate
 router = APIRouter(tags=["Inspecciones"])
 
 
-@router.get("/inspection-templates")
+@router.get("/pdf-templates")
 def list_pdf_templates(_: User = Depends(get_current_active_user)):
     """Lista los templates de PDF disponibles para los tipos de inspección."""
     from app.core.pdf_templates import AVAILABLE_TEMPLATES

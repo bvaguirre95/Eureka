@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     auth, companies, company_documents, dashboard,
     diagnostics, document_catalog, document_categories,
-    inspections, organizations, permissions, roles, users,sequence,geritra,public
+    inspections, organizations, permissions, roles, users,sequence,geritra,public,inspection_templates
 )
 
 api_router = APIRouter()
@@ -21,6 +21,7 @@ api_router.include_router(sequence.router)
 api_router.include_router(inspections.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(geritra.router)
+api_router.include_router(inspection_templates.router)
 api_router.include_router(public.router)
 
 

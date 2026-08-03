@@ -83,6 +83,13 @@ export const MENU_ITEMS = [
     enabled: true,
   },
   {
+    label: "Plantillas de Inspección",
+    path: "/dashboard/plantillas-inspeccion",
+    icon: ClipboardList,
+    permissions: ["inspections.view"],
+    enabled: true,
+  },
+  {
     label: "Usuarios",
     path: "/dashboard/usuarios",
     icon: Users,

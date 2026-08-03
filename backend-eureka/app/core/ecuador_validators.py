@@ -55,7 +55,6 @@ def is_valid_cedula(value: str) -> bool:
 
 
 def is_valid_ruc(value: str) -> bool:
-    """Valida un RUC ecuatoriano de 13 dígitos."""
     if not value.isdigit() or len(value) != 13:
         return False
 
@@ -65,42 +64,36 @@ def is_valid_ruc(value: str) -> bool:
     digits = [int(c) for c in value]
     third = digits[2]
 
-    # ─────────────────────────────────────────
     # Persona natural
-    # ─────────────────────────────────────────
     if third <= 5:
         coef = [2, 1, 2, 1, 2, 1, 2, 1, 2]
-        expected = _check_digit_mod10(digits[:9], coef)
-        
+
+        expected = _check_digit_mod10(
+            digits[:9],
+            coef
+        )
+
         if expected != digits[9]:
             return False
+
         return value[10:13] != "000"
 
-    # ─────────────────────────────────────────
     # Entidad pública
-    # ─────────────────────────────────────────
     if third == 6:
         coef = [3, 2, 7, 6, 5, 4, 3, 2]
-        expected = _check_digit_mod11(digits[:8], coef)
 
-        # CORRECCIÓN: Se eliminó "expected >= 10"
+        expected = _check_digit_mod11(
+            digits[:8],
+            coef
+        )
+
         if expected != digits[8]:
             return False
+
         return value[9:13] != "0000"
 
-    # ─────────────────────────────────────────
     # Sociedad privada
-    # ─────────────────────────────────────────
     if third == 9:
-        coef = [4, 3, 2, 7, 6, 5, 4, 3, 2]
-        expected = _check_digit_mod11(digits[:9], coef)
-
-        # CORRECCIÓN: Se eliminó "expected >= 10"
-        if expected != digits[9]:
-            return False
-        return value[10:13] != "000"
+        return value[10:13] == "001"
 
     return False
-
-# Prueba con el RUC de tu duda anterior (Retorna True exitosamente)
-print(is_valid_ruc("0791823595001")) 

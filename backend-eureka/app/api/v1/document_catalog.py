@@ -89,3 +89,13 @@ def deactivate_catalog_item(
     if not item.is_global and item.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso a este item")
     return crud_catalog.deactivate_catalog_item(db, item)
+@router.get("/catalog-items/next-code")
+async def get_next_catalog_item_code(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.manage_catalog")),
+):
+    """
+    Devuelve el siguiente código disponible para un nuevo item del catálogo.
+    """
+    next_code = crud_catalog.get_next_catalog_item_code(db)
+    return {"next_code": next_code}

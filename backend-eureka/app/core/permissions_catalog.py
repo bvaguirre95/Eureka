@@ -39,6 +39,7 @@ PERMISSIONS_CATALOG = [
     # ── Configuración ─────────────────────────────────────────────────────────
     ("settings.manage.category", "Configuración", "Gestionar configuración", "Administrar categorías y ajustes del módulo documental"),
     ("settings.manage.geritra",  "Configuración", "Gestionar GERITRA",      "Administrar categorías y factores de riesgo del módulo GERITRA"),
+    ("settings.manage.signers",  "Configuración", "Gestionar firmantes",      "Administrar firmantes de informes"),
     # ── Diagnóstico Anexo 1 ───────────────────────────────────────────────────
     ("diagnostics.view",   "Diagnósticos", "Ver diagnósticos",    "Consultar diagnósticos Anexo 1"),
     ("diagnostics.create", "Diagnósticos", "Crear diagnósticos",  "Iniciar y editar diagnósticos Anexo 1"),

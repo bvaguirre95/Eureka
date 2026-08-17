@@ -130,6 +130,10 @@ const deactivateCategory = async (categoryId) => {
   const response = await api.delete(`${CATEGORIES_PREFIX}/${categoryId}`);
   return response.data;
 };
+const getNextCatalogItemCode = async () => {
+  const { data } = await api.get(`${CATALOG_PREFIX}/catalog-items/next-code`);
+  return data.next_code;
+};
 
 const documentService = {
   getMatrix,
@@ -149,6 +153,7 @@ const documentService = {
   createGlobalCategory,
   updateCategory,
   deactivateCategory,
+  getNextCatalogItemCode,
 };
 
 export default documentService;

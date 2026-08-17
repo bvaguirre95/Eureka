@@ -28,26 +28,35 @@ class Organization(Base):
 
     __tablename__ = "organizations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), nullable=False)
+    id       = Column(Integer, primary_key=True, index=True)
+    name     = Column(String(200), nullable=False)
     org_type = Column(SAEnum(OrgTypeEnum, name="org_type_enum"), nullable=False)
+    slug     = Column(String(100), unique=True, nullable=True, index=True)
 
-    ruc = Column(String(13), nullable=True)
+    ruc   = Column(String(13),  nullable=True)
     email = Column(String(120), nullable=True)
-    phone = Column(String(20), nullable=True)
-    city = Column(String(100), nullable=True)
+    phone = Column(String(20),  nullable=True)
+    city  = Column(String(100), nullable=True)
 
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # ── Firmantes predeterminados ─────────────────────────────────────────────
+    # Se configuran una vez en la organización y se heredan a todas
+    # las empresas que no tengan firmantes propios configurados.
+    elaborated_role = Column(String(100), nullable=True)  # cargo del técnico que elabora
+    reviewed_by     = Column(String(150), nullable=True)
+    reviewed_role   = Column(String(100), nullable=True)
+    approved_by     = Column(String(150), nullable=True)
+    approved_role   = Column(String(100), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    users = relationship("User", back_populates="organization")
-    companies = relationship("Company", back_populates="organization")
-    roles = relationship("Role", back_populates="organization")
-    slug = Column(String(100), unique=True, nullable=True, index=True)
+    users         = relationship("User",                back_populates="organization")
+    companies     = relationship("Company",             back_populates="organization")
+    roles         = relationship("Role",                back_populates="organization")
     catalog_items = relationship("DocumentCatalogItem", back_populates="organization")
 
     def __repr__(self) -> str:

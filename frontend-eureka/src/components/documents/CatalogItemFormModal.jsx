@@ -53,7 +53,9 @@ export const CatalogItemFormModal = ({ open, onClose, item, onSaved }) => {
           is_active: item.is_active,
         });
       } else {
-        setForm(emptyForm);
+        documentService.getNextCatalogItemCode().then((nextCode) => {
+          setForm({ ...emptyForm, code: nextCode });
+        });
       }
       setErrors({});
     }
@@ -130,6 +132,7 @@ export const CatalogItemFormModal = ({ open, onClose, item, onSaved }) => {
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="PSST-013"
+                readOnly
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none transition-all"
               />
               {errors.code && <p className="text-xs text-red-600 mt-1">{errors.code}</p>}

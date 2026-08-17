@@ -113,14 +113,42 @@ def get_signers(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("companies.edit")),
 ):
+    """
+    Retorna los firmantes de la empresa.
+    Si la empresa no tiene firmantes propios, hereda los de la organización.
+    """
     _check(db, current_user, company_id)
-    from app.schemas.company import CompanySignersOut
+    from app.models.company import Company
+    from app.models.organization import Organization
+
     signers = crud_insp.get_company_signers(db, company_id)
+
+    # Herencia: si no hay firmantes propios, usar los de la organización
+    if not signers or not any([
+        signers.elaborated_role, signers.reviewed_by, signers.approved_by
+    ]):
+        company = db.get(Company, company_id)
+        if company and company.organization_id:
+            org = db.get(Organization, company.organization_id)
+            if org:
+                return {
+                    "id":              getattr(signers, "id", None),
+                    "company_id":      company_id,
+                    "elaborated_by":   None,
+                    "elaborated_role": org.elaborated_role,
+                    "reviewed_by":     org.reviewed_by,
+                    "reviewed_role":   org.reviewed_role,
+                    "approved_by":     org.approved_by,
+                    "approved_role":   org.approved_role,
+                    "inherited_from_org": True,
+                }
+
     if not signers:
         return {"id": None, "company_id": company_id,
                 "elaborated_by": None, "elaborated_role": None,
                 "reviewed_by": None, "reviewed_role": None,
                 "approved_by": None, "approved_role": None}
+    from app.schemas.company import CompanySignersOut
     return CompanySignersOut.model_validate(signers)
 @router.put("/companies/{company_id}/signers")
 def update_signers(

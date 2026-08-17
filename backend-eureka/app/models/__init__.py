@@ -7,7 +7,7 @@ from app.models.company import Company, CompanySigners  # noqa: F401
 from app.models.user_company import UserCompany  # noqa: F401
 from app.models.document_catalog import DocumentCatalogItem, PeriodicityEnum  # noqa: F401
 from app.models.document_category import DocumentCategory  # noqa: F401
-from app.models.company_document import CompanyDocument, DocumentStatusEnum  # noqa: F401
+from app.models.company_document import CompanyDocument, DocumentStatusEnum,CompanyCustomDocument,CustomDocStatusEnum,FileTypeEnum  # noqa: F401
 from app.models.diagnostic import (  # noqa: F401
     Diagnostic, DiagnosticAnswer, DiagnosticStatusEnum,
     DiagnosticTypeEnum, AnswerValueEnum,
@@ -32,6 +32,7 @@ __all__ = [
     "User", "Company", "CompanySigners", "UserCompany",
     "DocumentCatalogItem", "PeriodicityEnum",
     "DocumentCategory", "CompanyDocument", "DocumentStatusEnum",
+    "CompanyCustomDocument", "CustomDocStatusEnum", "FileTypeEnum",
     "Diagnostic", "DiagnosticAnswer", "DiagnosticStatusEnum",
     "DiagnosticTypeEnum", "AnswerValueEnum",
     "SequenceDef", "SequenceCounter", "ResetPolicyEnum",

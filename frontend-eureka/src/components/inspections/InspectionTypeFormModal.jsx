@@ -75,11 +75,39 @@ const slugify = (str) =>
 const emptyField = (order, scope = "matriz") => ({
   name: "", field_key: "", field_type: "texto",
   options: "", is_required: false, order, group_name: "", scope,
+  auto_sequence: false, seq_prefix: "",
 });
+
+// Helpers de auto-secuencia
+// El prefijo se guarda en options como "__seq__:EXT-{n:03d}"
+const SEQ_MARKER = "__seq__:";
+const encodeSeqOptions = (prefix) => `${SEQ_MARKER}${prefix || "{n:03d}"}`;
+const isSeqField = (options) => typeof options === "string" && options.startsWith(SEQ_MARKER);
+const getSeqPrefix = (options) => isSeqField(options) ? options.slice(SEQ_MARKER.length) : "";
+const formatSeqValue = (prefix, n) => {
+  // Reemplaza {n:03d} → número con ceros, {n} → número simple
+  return prefix
+    .replace(/\{n:0(\d)d\}/g, (_, digits) => String(n).padStart(Number(digits), "0"))
+    .replace(/\{n\}/g, String(n));
+};
 
 // ── Componente fila de campo ──────────────────────────────────────────────────
 
-const FieldRow = ({ field, index, onUpdate, onRemove, canRemove, showScope }) => (
+const FieldRow = ({ field, index, onUpdate, onRemove, canRemove }) => {
+  const isSeq    = isSeqField(field.options);
+  const seqPfx   = isSeq ? getSeqPrefix(field.options) : (field.seq_prefix || "");
+
+  const toggleSeq = (checked) => {
+    onUpdate(index, "auto_sequence", checked);
+    onUpdate(index, "options", checked ? encodeSeqOptions(seqPfx || "{n:03d}") : "");
+  };
+
+  const updatePrefix = (prefix) => {
+    onUpdate(index, "seq_prefix", prefix);
+    onUpdate(index, "options", encodeSeqOptions(prefix || "{n:03d}"));
+  };
+
+  return (
   <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/50">
     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
       <div className="sm:col-span-4">
@@ -131,8 +159,42 @@ const FieldRow = ({ field, index, onUpdate, onRemove, canRemove, showScope }) =>
       </div>
     </div>
 
+    {/* Auto-secuencia */}
+    <div className="mt-2 flex items-start gap-3 flex-wrap">
+      <label className={`flex items-center gap-1.5 text-xs cursor-pointer font-medium
+        ${isSeq ? "text-violet-700" : "text-gray-400"}`}>
+        <input
+          type="checkbox"
+          checked={isSeq}
+          onChange={(e) => toggleSeq(e.target.checked)}
+          className="w-3.5 h-3.5 accent-violet-600"
+        />
+        <Zap className="w-3 h-3" />
+        Auto-secuencia
+      </label>
+      {isSeq && (
+        <div className="flex-1 min-w-0 space-y-1">
+          <input
+            value={seqPfx}
+            onChange={(e) => updatePrefix(e.target.value)}
+            placeholder="EXT-{n:03d}"
+            className="w-full px-2 py-1 rounded-lg border border-violet-200 text-xs bg-violet-50 focus:border-violet-400 outline-none font-mono"
+          />
+          <p className="text-[10px] text-violet-500">
+            Vista previa: <strong className="font-mono">
+              {formatSeqValue(seqPfx || "{n:03d}", 1)}
+            </strong>, <strong className="font-mono">
+              {formatSeqValue(seqPfx || "{n:03d}", 2)}
+            </strong>...
+            &nbsp;·&nbsp; Usa <code className="bg-violet-100 px-1 rounded">{"{n:03d}"}</code> para 3 dígitos
+            o <code className="bg-violet-100 px-1 rounded">{"{n}"}</code> para número simple.
+          </p>
+        </div>
+      )}
+    </div>
+
     {/* Opciones de selección */}
-    {field.field_type === "seleccion" && (
+    {field.field_type === "seleccion" && !isSeq && (
       <div className="mt-2">
         <input
           value={field.options}
@@ -144,7 +206,9 @@ const FieldRow = ({ field, index, onUpdate, onRemove, canRemove, showScope }) =>
       </div>
     )}
   </div>
-);
+  );
+};
+
 
 // ── Modal principal ───────────────────────────────────────────────────────────
 
@@ -211,12 +275,22 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
     }
   }, [open, typeData]);
 
-  const fieldToState = (f) => ({
-    name: f.name, field_key: f.field_key, field_type: f.field_type,
-    options: f.options || "", is_required: f.is_required,
-    order: f.order, group_name: f.group_name || "",
-    scope: f.scope || "matriz",
-  });
+  const fieldToState = (f) => {
+    const opts  = f.options || "";
+    const isSeq = opts.startsWith("__seq__:");
+    return {
+      name:          f.name,
+      field_key:     f.field_key,
+      field_type:    (f.field_type || "texto").toLowerCase(),   // ← minúsculas siempre
+      options:       opts,
+      is_required:   f.is_required,
+      order:         f.order,
+      group_name:    f.group_name || "",
+      scope:         (f.scope || "matriz").toLowerCase(),        // ← minúsculas siempre
+      auto_sequence: isSeq,
+      seq_prefix:    isSeq ? opts.slice("__seq__:".length) : "",
+    };
+  };
 
   // ── Helpers de campos ────────────────────────────────────────────────────
 
@@ -259,10 +333,16 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
         .filter((f) => f.name.trim())
         .map((f, idx) => ({
           ...f,
-          scope,
-          field_key: f.field_key || slugify(f.name),
-          order: idx,
-          options: f.field_type === "seleccion" ? f.options : null,
+          scope:      scope.toLowerCase(),
+          field_type: (f.field_type || "texto").toLowerCase(),  // ← minúsculas siempre
+          field_key:  f.field_key || slugify(f.name),
+          order:      idx,
+          // Preservar options de auto-secuencia; si es selección usar las opciones del campo
+          options: f.options?.startsWith("__seq__:")
+            ? f.options
+            : (f.field_type || "").toLowerCase() === "seleccion"
+            ? f.options
+            : null,
         }));
 
     let allFields = [];

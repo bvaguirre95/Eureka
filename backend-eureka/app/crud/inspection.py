@@ -207,12 +207,21 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
 
     for idx, f in enumerate(type_in.fields):
         key = f.field_key or slugify(f.name, separator="_")
+        # Normalizar a minúsculas para evitar errores de enum en PostgreSQL
+        raw_ft    = str(f.field_type).lower() if f.field_type else "texto"
+        raw_scope = str(getattr(f, "scope", "matriz")).lower()
+        try:
+            ft_enum    = FieldTypeEnum(raw_ft)
+            scope_enum = FieldScopeEnum(raw_scope)
+        except ValueError:
+            ft_enum    = FieldTypeEnum.TEXTO
+            scope_enum = FieldScopeEnum.MATRIZ
         db.add(InspectionTypeField(
             inspection_type_id=itype.id, name=f.name, field_key=key,
-            field_type=f.field_type, options=f.options,
+            field_type=ft_enum, options=f.options,
             is_required=f.is_required, order=f.order or idx,
             group_name=f.group_name,
-            scope=getattr(f, "scope", FieldScopeEnum.MATRIZ),
+            scope=scope_enum,
         ))
 
     db.commit()
@@ -251,12 +260,20 @@ def update_inspection_type(db: Session, itype: InspectionType,
         db.flush()
         for idx, f in enumerate(type_in.fields):
             key = f.field_key or slugify(f.name, separator="_")
+            raw_ft    = str(f.field_type).lower() if f.field_type else "texto"
+            raw_scope = str(getattr(f, "scope", "matriz")).lower()
+            try:
+                ft_enum    = FieldTypeEnum(raw_ft)
+                scope_enum = FieldScopeEnum(raw_scope)
+            except ValueError:
+                ft_enum    = FieldTypeEnum.TEXTO
+                scope_enum = FieldScopeEnum.MATRIZ
             db.add(InspectionTypeField(
                 inspection_type_id=itype.id, name=f.name, field_key=key,
-                field_type=f.field_type, options=f.options,
+                field_type=ft_enum, options=f.options,
                 is_required=f.is_required, order=f.order or idx,
                 group_name=f.group_name,
-                scope=getattr(f, "scope", FieldScopeEnum.MATRIZ),
+                scope=scope_enum,
             ))
     db.commit()
     t = _load_type(db, itype.id)

@@ -67,6 +67,13 @@ export const MENU_ITEMS = [
         enabled: true,
       },
       {
+        label: "Firmantes de Informes",
+        path: "/dashboard/configuracion/firmantes",
+        icon: Users,
+        permissions: ["settings.manage.signers"],
+        enabled: true,
+      },
+      {
         label: "GERITRA",
         path: "/dashboard/configuracion/geritra",
         icon: ShieldCheck,

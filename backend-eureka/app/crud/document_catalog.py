@@ -92,3 +92,17 @@ def deactivate_catalog_item(db: Session, item: DocumentCatalogItem) -> DocumentC
     db.commit()
     db.refresh(item)
     return item
+
+def get_next_catalog_item_code(db: Session) -> str:
+    last = (
+        db.query(DocumentCatalogItem.code)
+        .filter(DocumentCatalogItem.code.like("PSST-%"))
+        .order_by(DocumentCatalogItem.code.desc())
+        .first()
+    )
+
+    if not last:
+        return "PSST-001"
+
+    num = int(last[0].replace("PSST-", ""))
+    return f"PSST-{num + 1:03d}"

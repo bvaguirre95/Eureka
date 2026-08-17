@@ -13,6 +13,7 @@ import CompanyHubPage          from "./pages/CompanyHubPage";
 import DocumentMatrixPage      from "./pages/DocumentMatrixPage";
 import DocumentCatalogPage     from "./pages/DocumentCatalogPage";
 import SettingsPage            from "./pages/SettingsPage";
+import SignersSettingsPage      from "./pages/SignersSettingsPage";
 import { DiagnosticListPage }  from "./pages/DiagnosticListPage";
 import { DiagnosticFormPage }  from "./pages/DiagnosticFormPage";
 import InspectionTypesPage     from "./pages/InspectionTypesPage";
@@ -25,7 +26,7 @@ import SequencePage            from "./pages/SequencePage";
 import { GeritraPage }         from "./pages/GeritraPage";
 import { GeritraMatrixPage }   from "./pages/GeritraMatrixPage";
 import { GeritraConfigSection }  from "./components/geritra/GeritraConfigSection";
-
+import { OrganizationProvider } from "./contexts/OrganizationContext";
 import "./App.css";
 
 // Wrapper reutilizable para rutas privadas con permisos
@@ -41,7 +42,8 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
+        <OrganizationProvider>
+                  <Routes>
           {/* ── Pública ─────────────────────────────────────────────────── */}
           <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
 
@@ -96,6 +98,8 @@ function App() {
           {/* ── Configuración ────────────────────────────────────────────── */}
           <Route path="/dashboard/configuracion/categorias-documentos"
             element={<PR perms={["settings.manage.category"]}><SettingsPage /></PR>} />
+          <Route path="/dashboard/configuracion/firmantes"
+            element={<PR perms={["settings.manage.signers"]}><SignersSettingsPage /></PR>} />
           <Route path="/dashboard/configuracion/geritra"
             element={<PR perms={["settings.manage.geritra"]}><GeritraConfigSection /></PR>} />
 
@@ -108,6 +112,7 @@ function App() {
           {/* ── Fallback ─────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </OrganizationProvider>
       </AuthProvider>
     </Router>
   );

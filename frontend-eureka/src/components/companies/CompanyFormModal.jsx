@@ -57,8 +57,9 @@ const emptySigners = {
 
 export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
   const [form, setForm]           = useState(emptyForm);
-  const [signers, setSigners]     = useState(emptySigners);
+  const [signers, setSigners]         = useState(emptySigners);
   const [signersLoading, setSignersLoading] = useState(false);
+  const [signersInherited, setSignersInherited] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors]       = useState({});
@@ -107,13 +108,16 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
     if (activeTab !== "firmantes" || !company) return;
     setSignersLoading(true);
     inspectionService.getSigners(company.id)
-      .then(data => setSigners({
-        elaborated_role: data.elaborated_role || "",
-        reviewed_by:     data.reviewed_by     || "",
-        reviewed_role:   data.reviewed_role   || "",
-        approved_by:     data.approved_by     || "",
-        approved_role:   data.approved_role   || "",
-      }))
+      .then(data => {
+        setSignersInherited(!!data.inherited_from_org);
+        setSigners({
+          elaborated_role: data.elaborated_role || "",
+          reviewed_by:     data.reviewed_by     || "",
+          reviewed_role:   data.reviewed_role   || "",
+          approved_by:     data.approved_by     || "",
+          approved_role:   data.approved_role   || "",
+        });
+      })
       .catch(() => {})
       .finally(() => setSignersLoading(false));
   }, [activeTab, company]);
@@ -554,12 +558,27 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
           {/* ── Tab: Firmantes ── */}
           {activeTab === "firmantes" && (
             <>
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                <p className="text-sm font-bold text-blue-800 mb-1">Firmantes del informe</p>
-                <p className="text-xs text-blue-600">
-                  Estos valores se usarán por defecto al crear cualquier inspección para esta empresa.
-                </p>
-              </div>
+              {/* Banner de herencia */}
+              {signersInherited ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p className="text-sm font-bold text-amber-800 mb-1">
+                    ✓ Heredando firmantes de la organización
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    Esta empresa usa los firmantes configurados en Configuración → Firmantes de informes.
+                    Si rellenas los campos abajo, sobreescribirán los valores de la organización
+                    solo para esta empresa.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <p className="text-sm font-bold text-blue-800 mb-1">Firmantes del informe</p>
+                  <p className="text-xs text-blue-600">
+                    Firmantes específicos para esta empresa. Si los dejas vacíos, se usarán
+                    los firmantes configurados en la organización.
+                  </p>
+                </div>
+              )}
 
               {signersLoading ? (
                 <div className="flex justify-center py-8">
@@ -579,7 +598,8 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
                       <label className="block text-xs font-medium text-gray-600 mb-1.5">Cargo / Rol</label>
                       <input value={signers.elaborated_role}
                         onChange={e => setSigner("elaborated_role", e.target.value)}
-                        placeholder="Ej: TÉCNICO SIG" className={inp} />
+                        placeholder={signersInherited ? "Heredado de la organización" : "Ej: TÉCNICO SIG"}
+                        className={inp} />
                     </div>
                   </div>
 
@@ -591,13 +611,15 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Nombre completo</label>
                         <input value={signers.reviewed_by}
                           onChange={e => setSigner("reviewed_by", e.target.value)}
-                          placeholder="Ej: Ing. Gabriela Avecillas A." className={inp} />
+                          placeholder={signersInherited ? "Heredado de la organización" : "Ej: Ing. Gabriela Avecillas A."}
+                          className={inp} />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Cargo / Rol</label>
                         <input value={signers.reviewed_role}
                           onChange={e => setSigner("reviewed_role", e.target.value)}
-                          placeholder="Ej: SUPERVISORA SIG" className={inp} />
+                          placeholder={signersInherited ? "Heredado de la organización" : "Ej: SUPERVISORA SIG"}
+                          className={inp} />
                       </div>
                     </div>
                   </div>
@@ -610,19 +632,24 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Nombre completo</label>
                         <input value={signers.approved_by}
                           onChange={e => setSigner("approved_by", e.target.value)}
-                          placeholder="Ej: Ing. Bryan Tinoco L., Mgtr." className={inp} />
+                          placeholder={signersInherited ? "Heredado de la organización" : "Ej: Ing. Bryan Tinoco L., Mgtr."}
+                          className={inp} />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Cargo / Rol</label>
                         <input value={signers.approved_role}
                           onChange={e => setSigner("approved_role", e.target.value)}
-                          placeholder="Ej: COORDINADOR SIG" className={inp} />
+                          placeholder={signersInherited ? "Heredado de la organización" : "Ej: COORDINADOR SIG"}
+                          className={inp} />
                       </div>
                     </div>
                   </div>
 
                   <p className="text-xs text-gray-400">
-                    Los firmantes se guardan al presionar <strong>"Guardar cambios"</strong> junto con el resto de la configuración.
+                    {signersInherited
+                      ? "Deja los campos vacíos para seguir usando los firmantes de la organización."
+                      : <>Los firmantes se guardan al presionar <strong>"Guardar cambios"</strong>.</>
+                    }
                   </p>
                 </div>
               )}

@@ -42,6 +42,8 @@ const deleteAction = (cId, id, aid)    => api.delete(`${cmpPrefix(cId)}/${id}/ac
 // ── Firmantes de empresa ──────────────────────────────────────────────────────
 const getSigners    = (cId)         => api.get(`/api/v1/companies/${cId}/signers`).then(r => r.data);
 const updateSigners = (cId, payload) => api.put(`/api/v1/companies/${cId}/signers`, payload).then(r => r.data);
+const getOrgSigners    = (orgId)         => api.get(`/api/v1/organizations/${orgId}/signers`).then(r => r.data);
+const updateOrgSigners = (orgId, payload) => api.put(`/api/v1/organizations/${orgId}/signers`, payload).then(r => r.data);
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 const getDashboard = (cId) =>
@@ -97,7 +99,7 @@ const inspectionService = {
   addRecord, updateRecord, deleteRecord,
   uploadRecordPhoto, deleteRecordPhoto,
   createAction, updateAction, deleteAction,
-  getSigners, updateSigners,
+  getSigners, updateSigners, getOrgSigners, updateOrgSigners,
   getDashboard, downloadPdf,closeInspection
 };
 export default inspectionService;

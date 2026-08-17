@@ -92,6 +92,19 @@ const FieldInput = ({ field, value, onChange, disabled }) => {
     return <input type="number" value={value || ""} onChange={e => onChange(e.target.value)} disabled={disabled} placeholder="0" className={base} />;
   }
 
+  // Campo de auto-secuencia — solo lectura, se generó automáticamente
+  if ((field.options || "").startsWith("__seq__:")) {
+    return (
+      <div className="flex items-center gap-2">
+        <input type="text" value={value || ""} readOnly
+          className={`${base} bg-violet-50 border-violet-200 text-violet-800 font-mono font-semibold cursor-default`} />
+        <span className="text-[10px] text-violet-500 whitespace-nowrap flex-shrink-0 flex items-center gap-0.5">
+          ⚡ Auto
+        </span>
+      </div>
+    );
+  }
+
   return (
     <input type="text" value={value || ""} onChange={e => onChange(e.target.value)} disabled={disabled}
       placeholder={field.name} className={base} />
@@ -648,10 +661,25 @@ export const InspectionFormPage = () => {
 
   const handleAddRecord = async () => {
     const recordCount = (insp?.records || []).length;
-    const emptyValues = (insp?.inspection_type_fields || []).map(f => ({ field_id: f.id, value: null }));
+    const nextN       = recordCount + 1;
+    const SEQ_MARKER  = "__seq__:";
+
+    // Para campos con auto-secuencia, calcular el valor automático
+    const autoValues = (insp?.inspection_type_fields || []).map(f => {
+      const opts = f.options || "";
+      if (opts.startsWith(SEQ_MARKER)) {
+        const prefix = opts.slice(SEQ_MARKER.length);
+        const value  = prefix
+          .replace(/\{n:0(\d)d\}/g, (_, digits) => String(nextN).padStart(Number(digits), "0"))
+          .replace(/\{n\}/g, String(nextN));
+        return { field_id: f.id, value };
+      }
+      return { field_id: f.id, value: null };
+    });
+
     try {
       const updated = await inspectionService.addRecord(companyId, inspectionId, {
-        order: recordCount + 1, has_finding: false, values: emptyValues,
+        order: nextN, has_finding: false, values: autoValues,
       });
       setInsp(updated);
     } catch (err) {

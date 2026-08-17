@@ -33,7 +33,7 @@ def seed():
                 name=tpl["name"],
                 description=tpl.get("description"),
                 category=tpl.get("category"),
-                structure_type=StructureTypeEnum(tpl["structure_type"]),
+                structure_type=(tpl["structure_type"]),
                 source=TemplateSourceEnum.GLOBAL,
                 suggested_periodicity=tpl.get("suggested_periodicity"),
                 suggested_pdf_template=tpl.get("suggested_pdf_template", "generico"),

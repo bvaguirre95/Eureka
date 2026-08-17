@@ -7,31 +7,34 @@ import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import roleService from "../services/role.service";
 import organizationService from "../services/organization.service";
-
+import { useOrganization } from "../contexts/OrganizationContext";
 export const RolesPage = () => {
   const { user, hasPermission } = useAuth();
   const canManage = hasPermission("roles.manage");
   const isPlatformAdmin = !user?.organization;
-
+  const {
+    organizations,
+    selectedOrgId,
+    selectOrganization,
+    loadOrganizations,} = useOrganization();
   const [roles, setRoles] = useState([]);
-  const [orgs, setOrgs] = useState([]);
-  const [selectedOrgId, setSelectedOrgId] = useState(null);
+  //const [orgs, setOrgs] = useState([]);
+  //const [selectedOrgId, setSelectedOrgId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
 
   // Super admin: cargar organizaciones para el selector
-  useEffect(() => {
-    if (!isPlatformAdmin) return;
-    organizationService.getOrganizations({ limit: 100 })
-      .then(data => {
-        const list = data.items || [];
-        setOrgs(list);
-        if (list.length > 0) setSelectedOrgId(list[0].id);
-      })
-      .catch(() => {});
-  }, [isPlatformAdmin]);
-
+//  useEffect(() => {
+//    if (!isPlatformAdmin) return;
+//    organizationService.getOrganizations({ limit: 100 })
+//      .then(data => {
+  //      const list = data.items || [];
+    //    setOrgs(list);
+      //  if (list.length > 0) setSelectedOrgId(list[0].id);
+//      })
+ //     .catch(() => {});
+ // }, [isPlatformAdmin]);
   // Cargar roles cuando cambia la org seleccionada
   const load = async () => {
     // Admin normal: carga sus propios roles (orgId no necesario)
@@ -75,9 +78,6 @@ export const RolesPage = () => {
         confirmButtonColor: "#16a34a" });
     }
   };
-
-  const selectedOrgName = orgs.find(o => o.id === selectedOrgId)?.name || "";
-
   return (
     <DashboardLayout>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -95,24 +95,6 @@ export const RolesPage = () => {
           </Button>
         )}
       </div>
-
-      {/* Selector de organización — solo super admin */}
-      {isPlatformAdmin && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
-          <p className="text-sm text-amber-700 font-medium flex-shrink-0">
-            🛡️ Modo super admin — Gestionar organización:
-          </p>
-          <select
-            value={selectedOrgId || ""}
-            onChange={e => setSelectedOrgId(Number(e.target.value))}
-            className="flex-1 px-4 py-2 rounded-lg border border-amber-300 bg-white text-sm focus:border-amber-500 outline-none"
-          >
-            {orgs.map(o => (
-              <option key={o.id} value={o.id}>{o.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {loading ? (
         <div className="flex justify-center py-16">

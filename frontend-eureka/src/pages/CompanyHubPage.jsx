@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Activity, ArrowLeft, Building2, ClipboardCheck,
-  FileText, LayoutDashboard, Settings, Shield, Users,
+  FileText, LayoutDashboard, Settings, Shield, Users
 } from "lucide-react";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { useAuth } from "../contexts/AuthContext";
@@ -192,16 +192,15 @@ export const CompanyHubPage = () => {
           badgeColor={inspBadgeColor}
           onClick={() => go("inspecciones/dashboard")}
         />
-
+        {hasPermission("risks.view") && (
         <ModuleCard
           icon={Activity}
           title="Matriz GERITRA"
           description="Identificación y evaluación de riesgos laborales por puesto de trabajo. ISO 45001:2018."
-          badge="NUEVO"
           badgeColor="bg-blue-100 text-blue-700"
           onClick={() => go("geritra")}
         />
-
+        )}
         <ModuleCard
           icon={LayoutDashboard}
           title="Diagnósticos"
@@ -215,7 +214,13 @@ export const CompanyHubPage = () => {
           description="Matriz documental y control de documentos SST requeridos por la normativa."
           onClick={() => go("documentos")}
         />
-
+        <ModuleCard
+          icon={FileText}
+          title="Documentos Propios"
+          description="Gestiona documentos propios: rutas de evacuación, reglamentos, actas, etc.
+            Con soporte de versiones y adjuntos."
+          onClick={() => go("documentos-propios")}
+        />
         {hasPermission("users.view") && (
           <ModuleCard
             icon={Users}

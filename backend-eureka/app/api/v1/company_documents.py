@@ -1,8 +1,10 @@
 import os
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_permission
@@ -357,6 +359,52 @@ def download_document(
 
 # ── DELETE ────────────────────────────────────────────────────────────────────
 
+class DueDateUpdate(BaseModel):
+    due_date: Optional[datetime]
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+@router.patch("/{document_id}/due-date", response_model=DocumentMatrixItem)
+def update_due_date(
+    company_id: int,
+    document_id: int,
+    body: DueDateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.upload")),
+):
+    """Actualiza la fecha de vencimiento de un documento (auto-calculada o manual)."""
+    _check_company_access(db, current_user, company_id)
+    company = _get_company_or_404(db, company_id)
+
+    document = crud_doc.get_company_document(db, document_id)
+    if not document or document.company_id != company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Documento no encontrado")
+
+    document.due_date = body.due_date
+    db.commit()
+    db.refresh(document)
+
+    # Limpiar logs de alertas para que se recalculen con la nueva fecha
+    try:
+        from app.crud.document_alert import clear_alert_logs_for_document
+        clear_alert_logs_for_document(db, document.id)
+    except Exception:
+        pass
+
+    matrix = crud_doc.get_document_matrix(
+        db, company, year=_period_year(document.period_label)
+    )
+    for row in matrix:
+        if (row.catalog_item_id == document.catalog_item_id
+                and row.period_label == document.period_label):
+            return row
+
+    raise HTTPException(status_code=500, detail="No se pudo reconstruir el estado")
+
+
 @router.delete("/{document_id}", response_model=DocumentMatrixItem)
 def delete_document_file(
     company_id: int,
@@ -387,4 +435,3 @@ def delete_document_file(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="No se pudo reconstruir el estado",
     )
-    

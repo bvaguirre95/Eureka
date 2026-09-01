@@ -7,6 +7,7 @@ import { SearchInput } from "../components/common/SearchInput";
 import { UserFormModal } from "../components/users/UserFormModal";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { useOrganization } from "../contexts/OrganizationContext";
 import { useDebounce } from "../hooks/useDebounce";
 import userService from "../services/user.service";
 import roleService from "../services/role.service";
@@ -14,7 +15,9 @@ import roleService from "../services/role.service";
 const PAGE_SIZE = 20;
 
 export const UsersPage = () => {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const { selectedOrgId } = useOrganization();
+  const isPlatformAdmin = !user?.organization;
   const canCreate = hasPermission("users.create");
   const canEdit = hasPermission("users.edit");
   const canDelete = hasPermission("users.delete");
@@ -36,12 +39,14 @@ export const UsersPage = () => {
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await userService.getUsers({
+      const params = {
         search: debouncedSearch || undefined,
         role_id: roleFilter || undefined,
         skip,
         limit: PAGE_SIZE,
-      });
+      };
+      if (isPlatformAdmin && selectedOrgId) params.org_id = selectedOrgId;
+      const data = await userService.getUsers(params);
       setUsers(data.items);
       setTotal(data.total);
     } catch (error) {
@@ -54,7 +59,7 @@ export const UsersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, roleFilter, skip]);
+  }, [debouncedSearch, roleFilter, skip, selectedOrgId]);
 
   useEffect(() => {
     roleService.getRoles().then(setRoles).catch(() => setRoles([]));

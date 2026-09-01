@@ -13,12 +13,16 @@ from app.models.user import User
 from app.schemas.dashboard import DashboardSummary
 
 
-def get_dashboard_summary(db: Session, user: User, year: Optional[int] = None) -> DashboardSummary:
+def get_dashboard_summary(db: Session, user: User, year: Optional[int] = None, org_id: Optional[int] = None) -> DashboardSummary:
     if user.is_platform_admin:
         organizations = db.execute(select(func.count()).select_from(Organization)).scalar_one()
-        companies = db.execute(select(func.count()).select_from(Company)).scalar_one()
-        users = db.execute(select(func.count()).select_from(User)).scalar_one()
-        return DashboardSummary(organizations=organizations, companies=companies, users=users)
+        if org_id is not None:
+            companies = db.execute(select(func.count()).select_from(Company).where(Company.organization_id == org_id)).scalar_one()
+            users_count = db.execute(select(func.count()).select_from(User).where(User.organization_id == org_id)).scalar_one()
+        else:
+            companies = db.execute(select(func.count()).select_from(Company)).scalar_one()
+            users_count = db.execute(select(func.count()).select_from(User)).scalar_one()
+        return DashboardSummary(organizations=organizations, companies=companies, users=users_count)
 
     year = year or datetime.now(timezone.utc).year
 

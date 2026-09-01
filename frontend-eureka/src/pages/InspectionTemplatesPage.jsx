@@ -12,6 +12,7 @@ import {
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { useOrganization } from "../contexts/OrganizationContext";
 import inspectionService from "../services/inspection.service";
 import { TemplatePreviewModal } from "../components/inspections/TemplatePreviewModal";
 import { InspectionTypeFormModal } from "../components/inspections/InspectionTypeFormModal";
@@ -135,8 +136,10 @@ const TemplateCard = ({ tpl, canManage, onPreview, onCopy, onEdit, onDelete, onU
 
 export const InspectionTemplatesPage = () => {
   const { user, hasPermission } = useAuth();
+  const { selectedOrgId } = useOrganization();
   const canManage = hasPermission("inspections.manage");
-  const orgId     = user?.organization?.id;
+  // Super-admin no tiene org propia; usa la org seleccionada en el selector global
+  const orgId = user?.organization?.id ?? selectedOrgId;
 
   const [templates, setTemplates]       = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -158,7 +161,7 @@ export const InspectionTemplatesPage = () => {
     } catch { /**/ } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [orgId]);
 
   // Categorías únicas para el filtro
   const categories = [...new Set(templates.map(t => t.category).filter(Boolean))].sort();

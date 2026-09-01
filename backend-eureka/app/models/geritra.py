@@ -99,6 +99,7 @@ class JobPosition(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"),
                              nullable=False, index=True)
     name                 = Column(String(150), nullable=False)
+    department           = Column(String(150), nullable=True)
     area                 = Column(String(150), nullable=True)
     process              = Column(String(150), nullable=True)
     num_workers          = Column(Integer, nullable=False, default=1)
@@ -155,6 +156,13 @@ class RiskMatrixRow(Base):
       P = IP + ICE + IC + IE  →  ER = P × C
 
     Riesgo residual (res_*): mismos índices pero post-control
+
+    Campos de gestión residual (pasos 20, 34-37 guía GERITRA):
+      risk_type         → clasificación del riesgo (Paso 20)
+      health_effects    → efectos sobre la salud (Paso 34)
+      health_surveillance → vigilancia de la salud (Paso 35)
+      control_date      → fecha de control e inspecciones (Paso 36)
+      improvement_notes → actividades de mejora continua (Paso 37)
     """
     __tablename__ = "risk_matrix_rows"
     id          = Column(Integer, primary_key=True, index=True)
@@ -174,6 +182,8 @@ class RiskMatrixRow(Base):
     probabilidad    = Column(Integer, nullable=True)
     estimacion      = Column(Integer, nullable=True)
     nivel_riesgo    = Column(SAEnum(RiskLevel, name="risk_level_enum"), nullable=True)
+    # Paso 20 — Clasificación del tipo de riesgo
+    risk_type       = Column(String(50), nullable=True)
     # Riesgo residual (post-control)
     res_ip          = Column(Integer, nullable=True)
     res_ic          = Column(Integer, nullable=True)
@@ -183,6 +193,11 @@ class RiskMatrixRow(Base):
     res_probabilidad = Column(Integer, nullable=True)
     res_estimacion   = Column(Integer, nullable=True)
     res_nivel_riesgo = Column(SAEnum(RiskLevel, name="risk_level_enum"), nullable=True)
+    # Pasos 34-37 guía GERITRA — Gestión del riesgo residual
+    health_effects      = Column(Text, nullable=True)   # Paso 34
+    health_surveillance = Column(Text, nullable=True)   # Paso 35
+    control_date        = Column(DateTime(timezone=True), nullable=True)  # Paso 36
+    improvement_notes   = Column(Text, nullable=True)   # Paso 37
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
     updated_at  = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     matrix   = relationship("RiskMatrix", back_populates="rows")

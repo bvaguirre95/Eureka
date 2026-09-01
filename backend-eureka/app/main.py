@@ -11,15 +11,18 @@ from app.core.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Al arrancar: sincroniza automáticamente el catálogo de permisos."""
+    """Al arrancar: sincroniza permisos e inicia el scheduler de alertas."""
     from app.core.sync_permissions import sync_permissions
+    from app.core.scheduler import start_scheduler, stop_scheduler
     from app.database import SessionLocal
     db = SessionLocal()
     try:
         sync_permissions(db)
     finally:
         db.close()
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 app = FastAPI(

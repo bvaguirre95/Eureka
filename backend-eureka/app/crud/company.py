@@ -31,15 +31,18 @@ def _apply_company_search(stmt, search: Optional[str] = None):
     return stmt
 
 
-def _base_companies_stmt_for_user(user: User, search: Optional[str] = None):
+def _base_companies_stmt_for_user(user: User, search: Optional[str] = None, org_id: Optional[int] = None):
     """
     Filtra empresas por organización del usuario Y por alcance de su rol:
     - No acotado (is_company_scoped=False): ve todas las empresas de su org.
     - Acotado: ve solo las empresas asignadas en user_companies.
-    - Super-admin (org=None): ve todas las empresas de todas las orgs.
+    - Super-admin (org=None): ve todas las empresas de todas las orgs,
+      con filtro opcional org_id para acotar a una organización específica.
     """
     if user.is_platform_admin:
         stmt = select(Company)
+        if org_id is not None:
+            stmt = stmt.where(Company.organization_id == org_id)
     elif not user.role.is_company_scoped:
         stmt = select(Company).where(Company.organization_id == user.organization_id)
     else:
@@ -55,17 +58,18 @@ def _base_companies_stmt_for_user(user: User, search: Optional[str] = None):
 
 
 def get_companies_for_user(
-    db: Session, user: User, search: Optional[str] = None, skip: int = 0, limit: int = 50
+    db: Session, user: User, search: Optional[str] = None, skip: int = 0, limit: int = 50,
+    org_id: Optional[int] = None,
 ) -> List[Company]:
-    stmt = _base_companies_stmt_for_user(user, search)
+    stmt = _base_companies_stmt_for_user(user, search, org_id=org_id)
     stmt = stmt.order_by(Company.razon_social).offset(skip).limit(limit)
     return list(db.execute(stmt).scalars().all())
 
 
 def count_companies_for_user(
-    db: Session, user: User, search: Optional[str] = None
+    db: Session, user: User, search: Optional[str] = None, org_id: Optional[int] = None,
 ) -> int:
-    stmt = _base_companies_stmt_for_user(user, search)
+    stmt = _base_companies_stmt_for_user(user, search, org_id=org_id)
     count_stmt = select(func.count()).select_from(stmt.subquery())
     return db.execute(count_stmt).scalar_one()
 

@@ -64,6 +64,18 @@ const deleteDocumentFile = async (companyId, documentId) => {
 };
 
 /**
+ * Actualiza la fecha de vencimiento de un documento existente.
+ * dueDate: Date | null (null = quitar fecha)
+ */
+const updateDueDate = async (companyId, documentId, dueDate) => {
+  const response = await api.patch(
+    `${companyDocsPrefix(companyId)}/${documentId}/due-date`,
+    { due_date: dueDate ? dueDate.toISOString() : null }
+  );
+  return response.data;
+};
+
+/**
  * Reenvía el email de notificación del último estado de validación
  * al correo de contacto de la empresa.
  */
@@ -154,6 +166,7 @@ const documentService = {
   updateCategory,
   deactivateCategory,
   getNextCatalogItemCode,
+  updateDueDate,
 };
 
 export default documentService;

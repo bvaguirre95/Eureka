@@ -26,6 +26,9 @@ import SequencePage            from "./pages/SequencePage";
 import { GeritraPage }         from "./pages/GeritraPage";
 import { GeritraMatrixPage }   from "./pages/GeritraMatrixPage";
 import { GeritraConfigSection }  from "./components/geritra/GeritraConfigSection";
+import CustomDocumentsPage       from "./pages/CustomDocumentsPage";
+import DocumentAlertsPage        from "./pages/DocumentAlertsPage";
+import JobPositionsPage           from "./pages/JobPositionsPage";
 import { OrganizationProvider } from "./contexts/OrganizationContext";
 import "./App.css";
 
@@ -80,6 +83,8 @@ function App() {
           {/* ── GERITRA ──────────────────────────────────────────────────── */}
           <Route path="/dashboard/empresas/:companyId/geritra"
             element={<PR perms={["risks.view"]}><GeritraPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/puestos-trabajo"
+            element={<PR perms={["risks.view"]}><JobPositionsPage /></PR>} />
           <Route path="/dashboard/empresas/:companyId/geritra/:matrixId"
             element={<PR perms={["risks.view"]}><GeritraMatrixPage /></PR>} />
 
@@ -92,8 +97,12 @@ function App() {
           {/* ── Documentos ───────────────────────────────────────────────── */}
           <Route path="/dashboard/empresas/:companyId/documentos"
             element={<PR perms={["documents.view"]}><DocumentMatrixPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/documentos-propios"
+            element={<PR perms={["documents.view"]}><CustomDocumentsPage /></PR>} />
           <Route path="/dashboard/catalogo-documentos"
             element={<PR perms={["documents.view"]}><DocumentCatalogPage /></PR>} />
+          <Route path="/dashboard/alertas-documentos"
+            element={<PR perms={["documents.view"]}><DocumentAlertsPage /></PR>} />
 
           {/* ── Configuración ────────────────────────────────────────────── */}
           <Route path="/dashboard/configuracion/categorias-documentos"

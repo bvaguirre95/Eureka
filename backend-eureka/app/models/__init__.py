@@ -26,6 +26,7 @@ from app.models.geritra import (  # noqa: F401
     ControlType, ActionStatus
 )
 from app.models.inspection_template import InspectionTemplate, TemplateSourceEnum  # noqa: F401
+from app.models.document_alert import DocumentAlertConfig, DocumentAlertLog  # noqa: F401
 __all__ = [
     "Base", "Organization", "OrgTypeEnum",
     "Permission", "Role", "role_permissions",
@@ -42,4 +43,5 @@ __all__ = [
     "RiskCategory", "RiskFactorCatalog", "JobPosition",
     "RiskMatrix", "RiskMatrixRow", "RiskLevel", "MatrixStatus",
     "ControlType", "ActionStatus", "InspectionTemplate", "TemplateSourceEnum",
+    "DocumentAlertConfig", "DocumentAlertLog",
 ]

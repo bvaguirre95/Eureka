@@ -393,3 +393,71 @@ def update_action(
         raise HTTPException(404, "Acción no encontrada")
     action = crud.update_action(db, action, data)
     return crud._action_to_out(action)
+
+
+# ── PDF ───────────────────────────────────────────────────────────────────────
+
+@router.get("/companies/{company_id}/risk-matrices/{matrix_id}/pdf")
+def download_matrix_pdf(
+    company_id: int,
+    matrix_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("risks.view")),
+):
+    """Genera y descarga el PDF de la Matriz GERITRA (portada + matriz + Anexo 01 + Anexo 03)."""
+    from fastapi.responses import Response
+    from app.core.pdf_geritra import generate_geritra_pdf
+    from app.models.company import Company
+
+    _check(db, current_user, company_id)
+    matrix = db.get(RiskMatrix, matrix_id)
+    if not matrix or matrix.company_id != company_id:
+        raise HTTPException(404, "Matriz no encontrada")
+
+    company = db.get(Company, company_id)
+    if not company:
+        raise HTTPException(404, "Empresa no encontrada")
+
+    matrix_out  = crud._matrix_to_out(matrix)
+    matrix_dict = matrix_out.model_dump()
+
+    # Datos completos del puesto de trabajo para Anexo 03
+    pos = matrix.job_position
+    position_dict = {
+        "name":                 pos.name                 if pos else "—",
+        "department":           pos.department           if pos else None,
+        "area":                 pos.area                 if pos else None,
+        "process":              pos.process              if pos else None,
+        "num_workers":          pos.num_workers          if pos else 1,
+        "has_disability":       pos.has_disability       if pos else False,
+        "disability_pct":       pos.disability_pct       if pos else None,
+        "routine_activity":     pos.routine_activity     if pos else None,
+        "non_routine_activity": pos.non_routine_activity if pos else None,
+        "machinery":            pos.machinery            if pos else None,
+        "technical_aids":       pos.technical_aids       if pos else None,
+        "description":          pos.description          if pos else None,
+    } if pos else {}
+
+    org_name = ""
+    if hasattr(company, "organization") and company.organization:
+        org_name = company.organization.name
+
+    pdf_bytes = generate_geritra_pdf(
+        matrix=matrix_dict,
+        position=position_dict,
+        company_name=company.razon_social,
+        company_ruc=company.ruc or "",
+        company_address=getattr(company, "direccion", "") or "",
+        company_phone=getattr(company, "telefono", "") or "",
+        org_name=org_name,
+        logo_path=getattr(company, "logo_path", None),
+    )
+
+    safe_name = (pos.name if pos else str(matrix_id)).replace(" ", "_").replace("/", "-")
+    filename  = f"GERITRA_{company.ruc or company_id}_{safe_name}_v{matrix.version}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

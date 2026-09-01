@@ -45,9 +45,12 @@ def _apply_user_filters(
     role_id: Optional[int] = None,
     search: Optional[str] = None,
     is_platform_admin: bool = False,
+    filter_org_id: Optional[int] = None,
 ):
     if not is_platform_admin and organization_id is not None:
         stmt = stmt.where(User.organization_id == organization_id)
+    elif is_platform_admin and filter_org_id is not None:
+        stmt = stmt.where(User.organization_id == filter_org_id)
     if role_id is not None:
         stmt = stmt.where(User.role_id == role_id)
     if search:
@@ -65,6 +68,7 @@ def get_users(
     search: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
+    org_id: Optional[int] = None,
 ) -> List[User]:
     stmt = select(User).options(
         selectinload(User.organization),
@@ -77,6 +81,7 @@ def get_users(
         role_id,
         search,
         requesting_user.is_platform_admin,
+        filter_org_id=org_id if requesting_user.is_platform_admin else None,
     )
     stmt = stmt.order_by(User.full_name).offset(skip).limit(limit)
     return list(db.execute(stmt).scalars().all())
@@ -87,6 +92,7 @@ def count_users(
     requesting_user: User,
     role_id: Optional[int] = None,
     search: Optional[str] = None,
+    org_id: Optional[int] = None,
 ) -> int:
     stmt = select(func.count()).select_from(User)
     stmt = _apply_user_filters(
@@ -95,6 +101,7 @@ def count_users(
         role_id,
         search,
         requesting_user.is_platform_admin,
+        filter_org_id=org_id if requesting_user.is_platform_admin else None,
     )
     return db.execute(stmt).scalar_one()
 

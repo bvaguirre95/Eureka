@@ -57,28 +57,46 @@ def generate_periods(periodicity: PeriodicityEnum, year: int):
     return []
 
 
+def _annual_due(year: int):
+    """Devuelve (period_label, due_date) estándar para un año."""
+    return str(year), datetime(year, 12, 31, tzinfo=timezone.utc)
+
+
 def get_document_matrix(
     db: Session, company: Company, year: Optional[int] = None, only_validated: bool = False
 ) -> List[DocumentMatrixItem]:
     """
     Construye la matriz de cumplimiento documental de una empresa.
 
+    Lógica por periodicidad:
+
+    ÚNICO:
+      Muestra TODOS los documentos cargados para ese ítem, sin filtro de año.
+      Trazabilidad completa.
+
+    ANUAL:
+      Muestra TODOS los documentos cargados para ese ítem (todos los años).
+      El filtro de año seleccionado NO excluye documentos de otros años.
+      Cada año donde existe un documento aparece como una fila separada.
+      Trazabilidad completa.
+
+    MENSUAL / BIMESTRAL:
+      Muestra solo los períodos del año seleccionado.
+      El filtro de año SÍ aplica aquí porque son períodos cortos.
+
     only_validated=True: solo incluye filas con documentos validados
-    (usado para el rol "Empresa", que no debe ver pendientes/rechazados).
+    (para el rol "Empresa", que no ve pendientes/rechazados).
     """
     year = year or datetime.now(timezone.utc).year
+
     applicable_items = get_applicable_catalog_items(
         db, company.organization_id, company.num_trabajadores
     )
 
-    rows_spec = []
-    catalog_item_ids = []
-    for item in applicable_items:
-        catalog_item_ids.append(item.id)
-        for period_label, period_display, due_date in generate_periods(item.periodicity, year):
-            rows_spec.append((item, period_label, period_display, due_date))
+    catalog_item_ids = [item.id for item in applicable_items]
 
-    existing_by_key = {}
+    # Cargar TODOS los documentos de esta empresa para los ítems aplicables
+    all_docs: dict[int, list] = {}   # catalog_item_id → [docs]
     if catalog_item_ids:
         stmt = (
             select(CompanyDocument)
@@ -90,55 +108,137 @@ def get_document_matrix(
                 CompanyDocument.company_id == company.id,
                 CompanyDocument.catalog_item_id.in_(catalog_item_ids),
             )
+            .order_by(CompanyDocument.period_label.asc())
         )
         for doc in db.execute(stmt).scalars().all():
-            existing_by_key[(doc.catalog_item_id, doc.period_label)] = doc
+            all_docs.setdefault(doc.catalog_item_id, []).append(doc)
 
     matrix: List[DocumentMatrixItem] = []
-    for item, period_label, period_display, due_date in rows_spec:
-        doc = existing_by_key.get((item.id, period_label))
 
-        if doc:
-            row = DocumentMatrixItem(
-                catalog_item_id=item.id,
-                code=item.code,
-                name=item.name,
-                category=item.category,
-                periodicity=item.periodicity,
-                period_label=period_label,
-                period_display=period_display,
-                company_document_id=doc.id,
-                status=doc.status,
-                has_file=bool(doc.file_path),
-                original_filename=doc.original_filename,
-                uploaded_at=doc.uploaded_at,
-                uploaded_by_name=doc.uploaded_by.full_name if doc.uploaded_by else None,
-                due_date=doc.due_date or due_date,
-                validated_at=doc.validated_at,
-                validated_by_name=doc.validated_by.full_name if doc.validated_by else None,
-                rejection_reason=doc.rejection_reason,
-            )
-            if only_validated and doc.status != DocumentStatusEnum.VALIDADO:
-                continue
-            matrix.append(row)
+    for item in applicable_items:
+
+        # ── ÚNICO ──────────────────────────────────────────────────────────────
+        if item.periodicity == PeriodicityEnum.UNICO:
+            docs = all_docs.get(item.id, [])
+            if docs:
+                for doc in docs:
+                    if only_validated and doc.status != DocumentStatusEnum.VALIDADO:
+                        continue
+                    matrix.append(DocumentMatrixItem(
+                        catalog_item_id=item.id,
+                        code=item.code, name=item.name,
+                        category=item.category, periodicity=item.periodicity,
+                        period_label=doc.period_label,
+                        period_display="Único",
+                        company_document_id=doc.id,
+                        status=doc.status,
+                        has_file=bool(doc.file_path),
+                        original_filename=doc.original_filename,
+                        uploaded_at=doc.uploaded_at,
+                        uploaded_by_name=doc.uploaded_by.full_name if doc.uploaded_by else None,
+                        due_date=doc.due_date,
+                        validated_at=doc.validated_at,
+                        validated_by_name=doc.validated_by.full_name if doc.validated_by else None,
+                        rejection_reason=doc.rejection_reason,
+                    ))
+            else:
+                if not only_validated:
+                    matrix.append(DocumentMatrixItem(
+                        catalog_item_id=item.id,
+                        code=item.code, name=item.name,
+                        category=item.category, periodicity=item.periodicity,
+                        period_label=None, period_display="Único",
+                        company_document_id=None,
+                        status=DocumentStatusEnum.PENDIENTE,
+                        has_file=False, due_date=None,
+                    ))
+
+        # ── ANUAL ──────────────────────────────────────────────────────────────
+        elif item.periodicity == PeriodicityEnum.ANUAL:
+            docs = all_docs.get(item.id, [])
+
+            # Agrupar por period_label (cada año es una fila)
+            by_year: dict[str, CompanyDocument] = {}
+            for doc in docs:
+                lbl = doc.period_label or str(year)
+                by_year[lbl] = doc
+
+            if by_year:
+                # Ordenar años desc para mostrar el más reciente primero
+                for lbl in sorted(by_year.keys(), reverse=True):
+                    doc = by_year[lbl]
+                    if only_validated and doc.status != DocumentStatusEnum.VALIDADO:
+                        continue
+                    _, default_due = _annual_due(int(lbl)) if lbl.isdigit() else (lbl, None)
+                    matrix.append(DocumentMatrixItem(
+                        catalog_item_id=item.id,
+                        code=item.code, name=item.name,
+                        category=item.category, periodicity=item.periodicity,
+                        period_label=lbl,
+                        period_display=f"Año {lbl}",
+                        company_document_id=doc.id,
+                        status=doc.status,
+                        has_file=bool(doc.file_path),
+                        original_filename=doc.original_filename,
+                        uploaded_at=doc.uploaded_at,
+                        uploaded_by_name=doc.uploaded_by.full_name if doc.uploaded_by else None,
+                        due_date=doc.due_date or default_due,
+                        validated_at=doc.validated_at,
+                        validated_by_name=doc.validated_by.full_name if doc.validated_by else None,
+                        rejection_reason=doc.rejection_reason,
+                    ))
+            else:
+                # No existe ningún doc — mostrar pendiente para el año seleccionado
+                if not only_validated:
+                    _, default_due = _annual_due(year)
+                    matrix.append(DocumentMatrixItem(
+                        catalog_item_id=item.id,
+                        code=item.code, name=item.name,
+                        category=item.category, periodicity=item.periodicity,
+                        period_label=str(year), period_display=f"Año {year}",
+                        company_document_id=None,
+                        status=DocumentStatusEnum.PENDIENTE,
+                        has_file=False, due_date=default_due,
+                    ))
+
+        # ── MENSUAL / BIMESTRAL ────────────────────────────────────────────────
         else:
-            if only_validated:
-                continue
-            matrix.append(
-                DocumentMatrixItem(
-                    catalog_item_id=item.id,
-                    code=item.code,
-                    name=item.name,
-                    category=item.category,
-                    periodicity=item.periodicity,
-                    period_label=period_label,
-                    period_display=period_display,
-                    company_document_id=None,
-                    status=DocumentStatusEnum.PENDIENTE,
-                    has_file=False,
-                    due_date=due_date,
-                )
-            )
+            docs_by_key: dict[str, CompanyDocument] = {
+                doc.period_label: doc
+                for doc in all_docs.get(item.id, [])
+            }
+            for period_label, period_display, due_date in generate_periods(item.periodicity, year):
+                doc = docs_by_key.get(period_label)
+                if doc:
+                    if only_validated and doc.status != DocumentStatusEnum.VALIDADO:
+                        continue
+                    matrix.append(DocumentMatrixItem(
+                        catalog_item_id=item.id,
+                        code=item.code, name=item.name,
+                        category=item.category, periodicity=item.periodicity,
+                        period_label=period_label, period_display=period_display,
+                        company_document_id=doc.id,
+                        status=doc.status,
+                        has_file=bool(doc.file_path),
+                        original_filename=doc.original_filename,
+                        uploaded_at=doc.uploaded_at,
+                        uploaded_by_name=doc.uploaded_by.full_name if doc.uploaded_by else None,
+                        due_date=doc.due_date or due_date,
+                        validated_at=doc.validated_at,
+                        validated_by_name=doc.validated_by.full_name if doc.validated_by else None,
+                        rejection_reason=doc.rejection_reason,
+                    ))
+                else:
+                    if not only_validated:
+                        matrix.append(DocumentMatrixItem(
+                            catalog_item_id=item.id,
+                            code=item.code, name=item.name,
+                            category=item.category, periodicity=item.periodicity,
+                            period_label=period_label, period_display=period_display,
+                            company_document_id=None,
+                            status=DocumentStatusEnum.PENDIENTE,
+                            has_file=False, due_date=due_date,
+                        ))
 
     return matrix
 
@@ -236,6 +336,14 @@ def upload_document(
 
     db.commit()
     db.refresh(doc)
+
+    # Limpiar logs de alertas para que se reenvíen en el próximo ciclo
+    try:
+        from app.crud.document_alert import clear_alert_logs_for_document
+        clear_alert_logs_for_document(db, doc.id)
+    except Exception:
+        pass  # No bloquear la carga si falla
+
     return doc
 
 

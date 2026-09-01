@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import Swal from "sweetalert2";
-import { Download, Eye, Loader, Mail, RefreshCw, ThumbsDown, ThumbsUp, Upload } from "lucide-react";
+import { Calendar, Download, Eye, Loader, Mail, Pencil, RefreshCw, ThumbsDown, ThumbsUp, Upload, X } from "lucide-react";
 import documentService from "../../services/document.service";
 import { STATUS_CONFIG } from "./documentStatus";
 import { DocumentPreviewModal } from "./DocumentPreviewModal";
@@ -14,21 +14,64 @@ const formatDate = (iso) => {
   });
 };
 
+// Convierte ISO a formato YYYY-MM-DD para input[type=date]
+const toInputDate = (iso) => {
+  if (!iso) return "";
+  return new Date(iso).toISOString().split("T")[0];
+};
+
 export const DocumentRow = ({ row, companyId, canUpload, canValidate, canReplaceValidated, onChanged }) => {
   const fileInputRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading]   = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [validating, setValidating] = useState(false);
-  const [resending, setResending] = useState(false);
+  const [resending, setResending]   = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [previewBlob, setPreviewBlob] = useState(null);
+
+  // Edición de fecha
+  const [editingDate, setEditingDate] = useState(false);
+  const [dateValue, setDateValue]     = useState("");
+  const [savingDate, setSavingDate]   = useState(false);
 
   const statusConfig = STATUS_CONFIG[row.status] || STATUS_CONFIG.pendiente;
   const StatusIcon = statusConfig.icon;
 
-  // Un documento ya validado no debería poder reemplazarse salvo que el
-  // usuario tenga el permiso "documents.replace_validated" (supervisor/admin).
   const canShowUpload = canUpload && (row.status !== "validado" || canReplaceValidated);
+  // Solo puede editar fecha si puede subir docs y el documento ya existe en BD
+  const canEditDate = canUpload && !!row.company_document_id;
+
+  const openDateEdit = () => {
+    setDateValue(toInputDate(row.due_date));
+    setEditingDate(true);
+  };
+
+  const cancelDateEdit = () => {
+    setEditingDate(false);
+    setDateValue("");
+  };
+
+  const saveDueDate = async () => {
+    if (!row.company_document_id) return;
+    setSavingDate(true);
+    try {
+      const newDate = dateValue ? new Date(dateValue + "T23:59:59") : null;
+      const updated = await documentService.updateDueDate(
+        companyId, row.company_document_id, newDate
+      );
+      onChanged(updated);
+      setEditingDate(false);
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "No se pudo actualizar la fecha",
+        text: err.response?.data?.detail || "Intenta nuevamente",
+        confirmButtonColor: "#16a34a",
+      });
+    } finally {
+      setSavingDate(false);
+    }
+  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -210,12 +253,53 @@ export const DocumentRow = ({ row, companyId, canUpload, canValidate, canReplace
         )}
       </td>
       <td className="px-4 py-3 text-sm">
-        {dueDateLabel ? (
-          <span className={isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}>
-            {dueDateLabel}
-          </span>
+        {editingDate ? (
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={dateValue}
+              onChange={e => setDateValue(e.target.value)}
+              className="text-xs px-2 py-1 border border-green-400 rounded-lg focus:ring-2 focus:ring-green-100 outline-none"
+              autoFocus
+            />
+            <button
+              onClick={saveDueDate}
+              disabled={savingDate}
+              className="p-1 rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+              title="Guardar"
+            >
+              {savingDate
+                ? <Loader className="w-3 h-3 animate-spin" />
+                : <span className="text-xs font-bold px-0.5">✓</span>
+              }
+            </button>
+            <button
+              onClick={cancelDateEdit}
+              className="p-1 rounded-md text-gray-400 hover:text-gray-600"
+              title="Cancelar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         ) : (
-          <span className="text-gray-300">—</span>
+          <div className="flex items-center gap-1.5 group">
+            {dueDateLabel ? (
+              <span className={isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}>
+                {dueDateLabel}
+              </span>
+            ) : (
+              <span className="text-gray-300">—</span>
+            )}
+            {canEditDate && (
+              <button
+                onClick={openDateEdit}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-green-600"
+                title="Editar fecha de vencimiento"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         )}
       </td>
       <td className="px-4 py-3 text-right">

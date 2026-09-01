@@ -23,13 +23,16 @@ LOGO_MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
 @router.get("/", response_model=Page[CompanyOut])
 def list_companies(
     search: Optional[str] = Query(None),
+    org_id: Optional[int] = Query(None, description="Filtrar por organización (solo super-admin)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    items = crud_company.get_companies_for_user(db, current_user, search=search, skip=skip, limit=limit)
-    total = crud_company.count_companies_for_user(db, current_user, search=search)
+    # org_id solo aplica para super-admin; usuarios normales ignoran el parámetro
+    effective_org_id = org_id if current_user.is_platform_admin else None
+    items = crud_company.get_companies_for_user(db, current_user, search=search, skip=skip, limit=limit, org_id=effective_org_id)
+    total = crud_company.count_companies_for_user(db, current_user, search=search, org_id=effective_org_id)
     return Page(items=items, total=total, skip=skip, limit=limit)
 
 
@@ -173,4 +176,3 @@ def delete_company_logo(
             pass
 
     return crud_company.remove_company_logo(db, company)
-

@@ -4,12 +4,16 @@ import { Building2, ChevronRight, Plus, Search, Users } from "lucide-react";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { useOrganization } from "../contexts/OrganizationContext";
 import companyService from "../services/company.service";
 import { CompanyFormModal } from "../components/companies/CompanyFormModal";
 import { CompanyLogo } from "../components/companies/CompanyLogo";
+
 export const CompaniesPage = () => {
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const { selectedOrgId } = useOrganization();
+  const isPlatformAdmin = !user?.organization;
   const canCreate = hasPermission("companies.create");
 
   const [companies, setCompanies] = useState([]);
@@ -22,13 +26,15 @@ export const CompaniesPage = () => {
   const load = async (q = search, p = page) => {
     setLoading(true);
     try {
-      const data = await companyService.getCompanies({ search: q, page: p, page_size: 20 });
+      const params = { search: q, page: p, page_size: 20 };
+      if (isPlatformAdmin && selectedOrgId) params.org_id = selectedOrgId;
+      const data = await companyService.getCompanies(params);
       setCompanies(data.items || data);
       setTotalPages(data.total_pages || 1);
     } catch { /**/ } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(1); load(search, 1); }, [selectedOrgId]);
 
   const handleSearch = (v) => {
     setSearch(v);

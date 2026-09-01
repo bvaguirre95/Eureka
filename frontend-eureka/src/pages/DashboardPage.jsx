@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Briefcase, Building2, FileText, ShieldCheck, Users } from "lucide-react";
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { useAuth } from "../contexts/AuthContext";
+import { useOrganization } from "../contexts/OrganizationContext";
 import dashboardService from "../services/dashboard.service";
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
@@ -33,18 +34,20 @@ const getWelcomeDescription = (user, hasPermission) => {
 
 export const DashboardPage = () => {
   const { user, hasPermission } = useAuth();
+  const { selectedOrgId } = useOrganization();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const isPlatformAdmin = !user?.organization;
+
   useEffect(() => {
+    setLoading(true);
     dashboardService
-      .getDashboardSummary()
+      .getDashboardSummary(null, isPlatformAdmin ? selectedOrgId : null)
       .then(setSummary)
       .catch(() => setSummary(null))
       .finally(() => setLoading(false));
-  }, []);
-
-  const isPlatformAdmin = !user?.organization;
+  }, [selectedOrgId]);
 
   return (
     <DashboardLayout>

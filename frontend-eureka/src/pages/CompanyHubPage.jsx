@@ -193,13 +193,17 @@ export const CompanyHubPage = () => {
           onClick={() => go("inspecciones/dashboard")}
         />
         {hasPermission("risks.view") && (
-        <ModuleCard
-          icon={Activity}
-          title="Matriz GERITRA"
-          description="Identificación y evaluación de riesgos laborales por puesto de trabajo. ISO 45001:2018."
-          badgeColor="bg-blue-100 text-blue-700"
-          onClick={() => go("geritra")}
-        />
+        <><ModuleCard
+            icon={Activity}
+            title="Matriz GERITRA"
+            description="Identificación y evaluación de riesgos laborales por puesto de trabajo. ISO 45001:2018."
+            badgeColor="bg-blue-100 text-blue-700"
+            onClick={() => go("geritra")} /><ModuleCard
+              icon={Users}
+              title="Puestos de Trabajo"
+              description="Gestiona puestos y departamentos. Define actividades, discapacidades y maquinarias por puesto."
+              badgeColor="bg-green-100 text-green-700"
+              onClick={() => go("puestos-trabajo")} /></>
         )}
         <ModuleCard
           icon={LayoutDashboard}

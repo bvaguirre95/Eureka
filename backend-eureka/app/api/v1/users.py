@@ -17,13 +17,15 @@ router = APIRouter(prefix="/users", tags=["Usuarios"])
 def list_users(
     role_id: Optional[int] = None,
     search: Optional[str] = Query(None),
+    org_id: Optional[int] = Query(None, description="Filtrar por organización (solo super-admin)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("users.view")),
 ):
-    items = get_users(db, current_user, role_id=role_id, search=search, skip=skip, limit=limit)
-    total = count_users(db, current_user, role_id=role_id, search=search)
+    effective_org_id = org_id if current_user.is_platform_admin else None
+    items = get_users(db, current_user, role_id=role_id, search=search, skip=skip, limit=limit, org_id=effective_org_id)
+    total = count_users(db, current_user, role_id=role_id, search=search, org_id=effective_org_id)
     return Page(items=items, total=total, skip=skip, limit=limit)
 
 

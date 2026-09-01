@@ -134,9 +134,18 @@ const RiskRowCard = ({ row, categories, index, companyId, matrixId,
       category_id: row.category_id || "",
       ip: row.ip, ic: row.ic, ice: row.ice, ie: row.ie,
       consecuencia: row.consecuencia,
+      // Paso 20
+      risk_type: row.risk_type || "",
+      // Riesgo residual
       res_ip: row.res_ip, res_ic: row.res_ic,
       res_ice: row.res_ice, res_ie: row.res_ie,
       res_consecuencia: row.res_consecuencia,
+      // Pasos 34-37
+      health_effects:      row.health_effects      || "",
+      health_surveillance: row.health_surveillance || "",
+      control_date:        row.control_date
+        ? new Date(row.control_date).toISOString().split("T")[0] : "",
+      improvement_notes:   row.improvement_notes   || "",
     });
   }, [row]);
 
@@ -148,7 +157,13 @@ const RiskRowCard = ({ row, categories, index, companyId, matrixId,
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onUpdate(row.id, { ...form, category_id: form.category_id || null });
+      const payload = {
+        ...form,
+        category_id:  form.category_id  || null,
+        control_date: form.control_date
+          ? new Date(form.control_date + "T00:00:00").toISOString() : null,
+      };
+      await onUpdate(row.id, payload);
     } finally { setSaving(false); }
   };
 
@@ -166,6 +181,7 @@ const RiskRowCard = ({ row, categories, index, companyId, matrixId,
     { id: "evaluacion", label: "Evaluación inicial" },
     { id: "controles",  label: `Controles (${row.controls.length})` },
     { id: "residual",   label: "Riesgo residual" },
+    { id: "gestion",    label: "Gestión" },
     { id: "acciones",   label: `Acciones (${row.actions.length})` },
   ];
 
@@ -185,6 +201,15 @@ const RiskRowCard = ({ row, categories, index, companyId, matrixId,
             {nivel && (
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${nivel.cls}`}>
                 {nivel.label} · ER={row.estimacion}
+              </span>
+            )}
+            {row.risk_type && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                {{
+                  FISICO: "Físico", QUIMICO_BIOLOGICO: "Químico-Biol.",
+                  ERGONOMICO: "Ergonómico", PSICOSOCIAL: "Psicosocial",
+                  SEGURIDAD: "Seguridad", AMBIENTAL: "Ambiental",
+                }[row.risk_type] || row.risk_type}
               </span>
             )}
             {resNivel && (
@@ -357,6 +382,105 @@ const RiskRowCard = ({ row, categories, index, companyId, matrixId,
           )}
 
           {/* Acciones correctivas */}
+          {activeSection === "gestion" && (
+            <div className="space-y-4">
+              <p className="text-xs text-gray-400 italic">
+                Completa los campos de gestión del riesgo residual (Pasos 20, 34–37 guía GERITRA).
+                Guarda al terminar.
+              </p>
+
+              {/* Paso 20 — Clasificación del tipo de riesgo */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Paso 20 · Clasificación del tipo de riesgo
+                </label>
+                <select
+                  disabled={!canEdit}
+                  value={form.risk_type || ""}
+                  onChange={e => handleChange("risk_type", e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none disabled:bg-gray-50"
+                >
+                  <option value="">— Seleccionar tipo —</option>
+                  <option value="FISICO">Factores de riesgo del medio ambiente físico</option>
+                  <option value="QUIMICO_BIOLOGICO">Factores de riesgo por contaminantes químico-biológicos</option>
+                  <option value="ERGONOMICO">Factores de riesgo ergonómico</option>
+                  <option value="PSICOSOCIAL">Factores de riesgo psicosocial</option>
+                  <option value="SEGURIDAD">Factores de riesgo a la seguridad</option>
+                  <option value="AMBIENTAL">Factores de riesgo ambiental</option>
+                </select>
+              </div>
+
+              {/* Paso 34 — Efectos sobre la salud */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Paso 34 · Efectos sobre la salud de los trabajadores
+                </label>
+                <textarea
+                  disabled={!canEdit}
+                  rows={3}
+                  placeholder="Describe los efectos que provoca la exposición al riesgo sobre la salud del trabajador..."
+                  value={form.health_effects}
+                  onChange={e => handleChange("health_effects", e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 resize-none focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none disabled:bg-gray-50"
+                />
+              </div>
+
+              {/* Paso 35 — Vigilancia de la salud */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Paso 35 · Vigilancia de la salud
+                </label>
+                <textarea
+                  disabled={!canEdit}
+                  rows={3}
+                  placeholder="Exámenes médicos preempleo, periódicos, de retiro. Periodicidad y fechas de control..."
+                  value={form.health_surveillance}
+                  onChange={e => handleChange("health_surveillance", e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 resize-none focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none disabled:bg-gray-50"
+                />
+              </div>
+
+              {/* Paso 36 — Fecha de control e inspecciones */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Paso 36 · Fecha de control e inspecciones
+                </label>
+                <input
+                  type="date"
+                  disabled={!canEdit}
+                  value={form.control_date}
+                  onChange={e => handleChange("control_date", e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none disabled:bg-gray-50"
+                />
+              </div>
+
+              {/* Paso 37 — Actividades de mejora continua */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Paso 37 · Actividades de mejora continua
+                </label>
+                <textarea
+                  disabled={!canEdit}
+                  rows={3}
+                  placeholder="Novedades, observaciones, ajustes o metodologías específicas de evaluación que deben desarrollarse..."
+                  value={form.improvement_notes}
+                  onChange={e => handleChange("improvement_notes", e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 resize-none focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none disabled:bg-gray-50"
+                />
+              </div>
+
+              {canEdit && (
+                <div className="flex justify-end pt-2">
+                  <Button onClick={handleSave} disabled={saving}
+                    className="bg-green-600 hover:bg-green-700 text-white text-xs">
+                    {saving ? "Guardando..." : "Guardar gestión"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Acciones correctivas */}
           {activeSection === "acciones" && (
             <div className="space-y-2">
               {row.actions.length === 0 && (
@@ -409,6 +533,7 @@ export const GeritraMatrixPage = () => {
   const [newRow, setNewRow]         = useState(EMPTY_ROW);
   const [savingRow, setSavingRow]   = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -475,13 +600,16 @@ export const GeritraMatrixPage = () => {
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const a   = document.createElement("a");
       a.href    = url;
-      a.download = `GERITRA_${matrix?.job_position_name || matrixId}.pdf`;
+      a.download = `GERITRA_${matrix?.job_position_name || matrixId}_v${matrix?.version || 1}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      Swal.fire({ icon: "info", title: "PDF en desarrollo",
-        text: "La exportación PDF de GERITRA estará disponible próximamente.",
-        confirmButtonColor: "#16a34a" });
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Error al generar PDF",
+        text: err.response?.data?.detail || "Intenta nuevamente.",
+        confirmButtonColor: "#16a34a",
+      });
     } finally { setDownloading(false); }
   };
 
@@ -530,6 +658,12 @@ export const GeritraMatrixPage = () => {
           </div>
 
           <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={() => setShowResults(r => !r)}
+              variant="outline"
+              className={`text-sm ${showResults ? "bg-green-50 border-green-300 text-green-700" : ""}`}>
+              📊 {showResults ? "Ocultar resultados" : "Ver resultados"}
+            </Button>
             <Button onClick={handleDownload} disabled={downloading}
               variant="outline" className="text-sm">
               <Download className="w-4 h-4 mr-1.5" />
@@ -576,6 +710,239 @@ export const GeritraMatrixPage = () => {
           </span>
         ))}
       </div>
+
+      {/* ── Panel de Resultados ── */}
+      {showResults && matrix.rows.length > 0 && (() => {
+        const rows = matrix.rows;
+        const counts = (field) => rows.reduce((acc, r) => {
+          const k = r[field];
+          if (k) acc[k] = (acc[k] || 0) + 1;
+          return acc;
+        }, {});
+        const initialCounts  = counts("nivel_riesgo");
+        const residualCounts = counts("res_nivel_riesgo");
+        const nivelOrder = ["INTOLERABLE","IMPORTANTE","MODERADO","TOLERABLE","TRIVIAL"];
+
+        // Reducción de riesgo por fila
+        const nivelVal = { TRIVIAL:1, TOLERABLE:2, MODERADO:3, IMPORTANTE:4, INTOLERABLE:5 };
+        const improved = rows.filter(r =>
+          r.nivel_riesgo && r.res_nivel_riesgo &&
+          (nivelVal[r.res_nivel_riesgo] || 99) < (nivelVal[r.nivel_riesgo] || 99)
+        ).length;
+        const noChange = rows.filter(r =>
+          r.nivel_riesgo && r.res_nivel_riesgo &&
+          r.res_nivel_riesgo === r.nivel_riesgo
+        ).length;
+        const noResidual = rows.filter(r => !r.res_nivel_riesgo).length;
+
+        // Por tipo de riesgo
+        const byType = rows.reduce((acc, r) => {
+          const k = r.risk_type || "SIN_CLASIFICAR";
+          if (!acc[k]) acc[k] = { total: 0, criticos: 0 };
+          acc[k].total++;
+          if (["IMPORTANTE","INTOLERABLE"].includes(r.nivel_riesgo)) acc[k].criticos++;
+          return acc;
+        }, {});
+
+        const TYPE_LABEL = {
+          FISICO: "Físico", QUIMICO_BIOLOGICO: "Químico-Biol.",
+          ERGONOMICO: "Ergonómico", PSICOSOCIAL: "Psicosocial",
+          SEGURIDAD: "Seguridad", AMBIENTAL: "Ambiental",
+          SIN_CLASIFICAR: "Sin clasificar",
+        };
+
+        return (
+          <div className="bg-white border border-green-100 rounded-2xl p-5 shadow-sm mb-2">
+            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+              📊 Resultados de la Gestión de Riesgos
+              <span className="text-xs font-normal text-gray-400">
+                {rows.length} riesgos evaluados · {matrix.job_position_name}
+              </span>
+            </h3>
+
+            <div className="grid sm:grid-cols-3 gap-4 mb-5">
+
+              {/* Evaluación inicial */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                  Evaluación inicial
+                </p>
+                <div className="space-y-2">
+                  {nivelOrder.map(n => {
+                    const count = initialCounts[n] || 0;
+                    if (!count) return null;
+                    const cfg = NIVEL[n];
+                    return (
+                      <div key={n} className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                        <span className="text-xs text-gray-600 flex-1">{cfg.label}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.cls}`}>
+                          {count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Después de controles */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                  Riesgo residual
+                </p>
+                <div className="space-y-2">
+                  {nivelOrder.map(n => {
+                    const count = residualCounts[n] || 0;
+                    if (!count) return null;
+                    const cfg = NIVEL[n];
+                    return (
+                      <div key={n} className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                        <span className="text-xs text-gray-600 flex-1">{cfg.label}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.cls}`}>
+                          {count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {noResidual > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" />
+                      <span className="text-xs text-gray-400 flex-1">Sin evaluar</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                        {noResidual}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Resumen de reducción */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                  Efecto de controles
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">✅</span>
+                    <span className="text-xs text-gray-600 flex-1">Nivel reducido</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                      {improved}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">➡️</span>
+                    <span className="text-xs text-gray-600 flex-1">Sin cambio</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                      {noChange}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">⏳</span>
+                    <span className="text-xs text-gray-600 flex-1">Pendiente evaluar</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">
+                      {noResidual}
+                    </span>
+                  </div>
+                  {improved > 0 && (
+                    <p className="text-[11px] text-green-600 font-medium mt-2 pt-2 border-t border-gray-200">
+                      {Math.round((improved / rows.filter(r => r.res_nivel_riesgo).length) * 100)}% de riesgos con mejora
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Por tipo de riesgo */}
+            {Object.keys(byType).length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                  Por tipo de riesgo (Paso 20)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(byType).map(([type, data]) => (
+                    <div key={type}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs">
+                      <span className="font-medium text-gray-700">
+                        {TYPE_LABEL[type] || type}
+                      </span>
+                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-600">{data.total} riesgos</span>
+                      {data.criticos > 0 && (
+                        <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                          {data.criticos} críticos
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tabla comparativa fila a fila */}
+            <div className="mt-4">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                Comparativo por peligro
+              </p>
+              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500">
+                      <th className="px-3 py-2 text-left font-semibold">Peligro</th>
+                      <th className="px-3 py-2 text-left font-semibold">Tipo</th>
+                      <th className="px-3 py-2 text-center font-semibold">Inicial</th>
+                      <th className="px-3 py-2 text-center font-semibold">Controles</th>
+                      <th className="px-3 py-2 text-center font-semibold">Residual</th>
+                      <th className="px-3 py-2 text-center font-semibold">Tendencia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => {
+                      const ini = r.nivel_riesgo  ? NIVEL[r.nivel_riesgo]  : null;
+                      const res = r.res_nivel_riesgo ? NIVEL[r.res_nivel_riesgo] : null;
+                      const ini_v = nivelVal[r.nivel_riesgo]     || 0;
+                      const res_v = nivelVal[r.res_nivel_riesgo] || 0;
+                      const trend = !res_v ? "⏳" : res_v < ini_v ? "⬇️" : res_v > ini_v ? "⬆️" : "➡️";
+                      const ctrlCount = r.controls?.length || 0;
+                      return (
+                        <tr key={r.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="px-3 py-2 font-medium text-gray-800 max-w-[180px]">
+                            <div className="truncate" title={r.peligro}>{r.peligro}</div>
+                            {r.efecto && (
+                              <div className="text-[10px] text-gray-400 truncate">{r.efecto}</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500">
+                            {TYPE_LABEL[r.risk_type] || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {ini ? (
+                              <span className={`px-2 py-0.5 rounded-full font-bold ${ini.cls}`}>
+                                {ini.label}
+                              </span>
+                            ) : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-center text-gray-500">
+                            {ctrlCount > 0 ? `${ctrlCount} control${ctrlCount > 1 ? "es" : ""}` : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {res ? (
+                              <span className={`px-2 py-0.5 rounded-full font-bold ${res.cls}`}>
+                                {res.label}
+                              </span>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2 text-center text-base">{trend}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Filas */}
       <div className="space-y-3">

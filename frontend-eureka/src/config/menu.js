@@ -1,5 +1,6 @@
 import {
   Activity,
+  Bell,
   Briefcase,
   Building2,
   ClipboardCheck,
@@ -81,6 +82,13 @@ export const MENU_ITEMS = [
         enabled: true,
       },
     ],
+  },
+  {
+    label: "Alertas de Vencimiento",
+    path: "/dashboard/alertas-documentos",
+    icon: Bell,
+    permissions: ["documents.view"],
+    enabled: true,
   },
   {
     label: "Tipos de Inspección",

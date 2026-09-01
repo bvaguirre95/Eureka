@@ -3,7 +3,8 @@ import api from "./api";
 const COMPANIES_PREFIX = "/api/v1/companies";
 
 /**
- * params: { search, skip, limit }
+ * params: { search, skip, limit, org_id }
+ * org_id: filtro por organización, solo aplica para super-admin
  * Devuelve { items, total, skip, limit }
  */
 const getCompanies = async (params = {}) => {

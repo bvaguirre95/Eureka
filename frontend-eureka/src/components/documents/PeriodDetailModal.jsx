@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import Swal from "sweetalert2";
-import { Download, Eye, Loader, RefreshCw, ThumbsDown, ThumbsUp, Upload } from "lucide-react";
+import { Calendar, Download, Eye, Loader, Pencil, RefreshCw, ThumbsDown, ThumbsUp, Upload, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,13 +21,46 @@ const formatDate = (iso) => {
   });
 };
 
+const toInputDate = (iso) => {
+  if (!iso) return "";
+  return new Date(iso).toISOString().split("T")[0];
+};
+
 export const PeriodDetailModal = ({ open, onClose, row, companyId, canUpload, canValidate, canReplaceValidated, onChanged }) => {
   const fileInputRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading]   = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [previewBlob, setPreviewBlob] = useState(null);
+
+  // Edición de fecha
+  const [editingDate, setEditingDate] = useState(false);
+  const [dateValue, setDateValue]     = useState("");
+  const [savingDate, setSavingDate]   = useState(false);
+
+  const canEditDate = canUpload && !!row?.company_document_id;
+
+  const openDateEdit = () => {
+    setDateValue(toInputDate(row.due_date));
+    setEditingDate(true);
+  };
+
+  const saveDueDate = async () => {
+    setSavingDate(true);
+    try {
+      const newDate = dateValue ? new Date(dateValue + "T23:59:59") : null;
+      const updated = await documentService.updateDueDate(companyId, row.company_document_id, newDate);
+      onChanged(updated);
+      setEditingDate(false);
+    } catch (err) {
+      Swal.fire({
+        icon: "error", title: "No se pudo actualizar la fecha",
+        text: err.response?.data?.detail || "Intenta nuevamente",
+        confirmButtonColor: "#16a34a",
+      });
+    } finally { setSavingDate(false); }
+  };
 
   if (!row) return null;
 
@@ -191,10 +224,48 @@ export const PeriodDetailModal = ({ open, onClose, row, companyId, canUpload, ca
               <StatusIcon className="w-4 h-4" />
               {statusConfig.label}
             </span>
-            {dueDateLabel && (
-              <span className={`text-sm ${isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}>
-                Vence: {dueDateLabel}
-              </span>
+            {editingDate ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateValue}
+                  onChange={e => setDateValue(e.target.value)}
+                  className="text-sm px-2 py-1.5 border border-green-400 rounded-lg focus:ring-2 focus:ring-green-100 outline-none"
+                  autoFocus
+                />
+                <button
+                  onClick={saveDueDate}
+                  disabled={savingDate}
+                  className="px-2 py-1.5 rounded-lg bg-green-600 text-white text-xs font-bold hover:bg-green-700 disabled:opacity-50"
+                >
+                  {savingDate ? <Loader className="w-3 h-3 animate-spin" /> : "✓"}
+                </button>
+                <button
+                  onClick={() => setEditingDate(false)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 group">
+                {dueDateLabel ? (
+                  <span className={`text-sm ${isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}>
+                    Vence: {dueDateLabel}
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-400">Sin fecha de vencimiento</span>
+                )}
+                {canEditDate && (
+                  <button
+                    onClick={openDateEdit}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-green-600"
+                    title="Editar fecha de vencimiento"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

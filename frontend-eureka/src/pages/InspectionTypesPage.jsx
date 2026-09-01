@@ -8,6 +8,7 @@ import { ClipboardList, Pencil, Plus, Power, Settings, Trash2 } from "lucide-rea
 import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { useOrganization } from "../contexts/OrganizationContext";
 import inspectionService from "../services/inspection.service";
 import InspectionTypeFormModal from "../components/inspections/InspectionTypeFormModal";
 
@@ -19,8 +20,10 @@ const PERIODICITY_LABELS = {
 
 export const InspectionTypesPage = () => {
   const { user, hasPermission } = useAuth();
+  const { selectedOrgId } = useOrganization();
   const canManage = hasPermission("inspections.manage");
-  const orgId = user?.organization?.id;
+  // Super-admin no tiene org propia; usa la org seleccionada en el selector global
+  const orgId = user?.organization?.id ?? selectedOrgId;
 
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);

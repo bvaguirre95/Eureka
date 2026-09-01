@@ -65,6 +65,7 @@ class RiskFactorOut(BaseModel):
 
 class JobPositionCreate(BaseModel):
     name:                 str  = Field(..., min_length=1, max_length=150)
+    department:           Optional[str] = None
     area:                 Optional[str] = None
     process:              Optional[str] = None
     num_workers:          int  = Field(1, ge=1)
@@ -80,6 +81,7 @@ class JobPositionCreate(BaseModel):
 
 class JobPositionUpdate(BaseModel):
     name:                 Optional[str]  = None
+    department:           Optional[str]  = None
     area:                 Optional[str]  = None
     process:              Optional[str]  = None
     num_workers:          Optional[int]  = Field(None, ge=1)
@@ -98,6 +100,7 @@ class JobPositionOut(BaseModel):
     company_id:           int
     organization_id:      int
     name:                 str
+    department:           Optional[str]
     area:                 Optional[str]
     process:              Optional[str]
     num_workers:          int
@@ -173,6 +176,8 @@ class RiskMatrixRowCreate(BaseModel):
     ice:          Optional[int] = Field(None, ge=1, le=3)
     ie:           Optional[int] = Field(None, ge=1, le=3)
     consecuencia: Optional[int] = Field(None, ge=1, le=4)
+    # Paso 20 — Clasificación del tipo de riesgo
+    risk_type:    Optional[str] = None
 
 
 class RiskMatrixRowUpdate(BaseModel):
@@ -187,12 +192,19 @@ class RiskMatrixRowUpdate(BaseModel):
     ice:          Optional[int] = Field(None, ge=1, le=3)
     ie:           Optional[int] = Field(None, ge=1, le=3)
     consecuencia: Optional[int] = Field(None, ge=1, le=4)
+    # Paso 20
+    risk_type:    Optional[str] = None
     # Riesgo residual (post-control)
     res_ip:           Optional[int] = Field(None, ge=1, le=3)
     res_ic:           Optional[int] = Field(None, ge=1, le=3)
     res_ice:          Optional[int] = Field(None, ge=1, le=3)
     res_ie:           Optional[int] = Field(None, ge=1, le=3)
     res_consecuencia: Optional[int] = Field(None, ge=1, le=4)
+    # Pasos 34-37 — Gestión del riesgo residual
+    health_effects:      Optional[str]      = None
+    health_surveillance: Optional[str]      = None
+    control_date:        Optional[datetime] = None
+    improvement_notes:   Optional[str]      = None
 
 
 class RiskMatrixRowOut(BaseModel):
@@ -214,6 +226,7 @@ class RiskMatrixRowOut(BaseModel):
     probabilidad:  Optional[int]
     estimacion:    Optional[int]
     nivel_riesgo:  Optional[RiskLevel]
+    risk_type:     Optional[str]      = None
     # Riesgo residual
     res_ip:           Optional[int]     = None
     res_ic:           Optional[int]     = None
@@ -223,6 +236,11 @@ class RiskMatrixRowOut(BaseModel):
     res_probabilidad: Optional[int]     = None
     res_estimacion:   Optional[int]     = None
     res_nivel_riesgo: Optional[RiskLevel] = None
+    # Pasos 34-37
+    health_effects:      Optional[str]      = None
+    health_surveillance: Optional[str]      = None
+    control_date:        Optional[datetime] = None
+    improvement_notes:   Optional[str]      = None
     controls:      List[RiskControlOut] = []
     actions:       List[RiskActionOut]  = []
     class Config: from_attributes = True

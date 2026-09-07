@@ -62,6 +62,10 @@ PERMISSIONS_CATALOG = [
     ("risks.create", "GERITRA", "Crear/editar matrices",       "Registrar y editar matrices de riesgo y puestos"),
     ("risks.manage", "GERITRA", "Gestionar catálogo de riesgos","Crear categorías y factores de riesgo"),
     ("risks.delete", "GERITRA", "Eliminar matrices",           "Eliminar matrices y puestos de trabajo"),
+     ("workers.view",       "Trabajadores", "Ver trabajadores",               "Consultar listado y ficha de trabajadores"),
+    ("workers.create",     "Trabajadores", "Registrar trabajadores",          "Crear nuevos registros de trabajadores"),
+    ("workers.edit",       "Trabajadores", "Editar trabajadores",             "Modificar datos laborales e identificación"),
+    ("workers.deactivate", "Trabajadores", "Retirar / desactivar trabajadores","Cambiar estado a Retirado, Inactivo o Suspendido"),
     # ── NUEVO MÓDULO — plantilla para 
     # ── NUEVO MÓDULO — plantilla para copiar ──────────────────────────────────
     # ("mi_modulo.view",   "Mi Módulo", "Ver X",    "..."),

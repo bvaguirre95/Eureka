@@ -29,6 +29,8 @@ import { GeritraConfigSection }  from "./components/geritra/GeritraConfigSection
 import CustomDocumentsPage       from "./pages/CustomDocumentsPage";
 import DocumentAlertsPage        from "./pages/DocumentAlertsPage";
 import JobPositionsPage           from "./pages/JobPositionsPage";
+import WorkersPage                from "./pages/WorkersPage";
+import WorkerDetailPage           from "./pages/WorkerDetailPage";
 import { OrganizationProvider } from "./contexts/OrganizationContext";
 import "./App.css";
 
@@ -85,6 +87,10 @@ function App() {
             element={<PR perms={["risks.view"]}><GeritraPage /></PR>} />
           <Route path="/dashboard/empresas/:companyId/puestos-trabajo"
             element={<PR perms={["risks.view"]}><JobPositionsPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/trabajadores"
+            element={<PR perms={["workers.view"]}><WorkersPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/trabajadores/:workerId"
+            element={<PR perms={["workers.view"]}><WorkerDetailPage /></PR>} />
           <Route path="/dashboard/empresas/:companyId/geritra/:matrixId"
             element={<PR perms={["risks.view"]}><GeritraMatrixPage /></PR>} />
 

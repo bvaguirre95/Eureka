@@ -206,6 +206,13 @@ export const CompanyHubPage = () => {
               onClick={() => go("puestos-trabajo")} /></>
         )}
         <ModuleCard
+          icon={Users}
+          title="Trabajadores"
+          description="Gestiona el personal de la empresa. Historial de puestos, discapacidades y ficha SST individual."
+          badgeColor="bg-teal-100 text-teal-700"
+          onClick={() => go("trabajadores")}
+        />
+        <ModuleCard
           icon={LayoutDashboard}
           title="Diagnósticos"
           description="Diagnóstico inicial de cumplimiento normativo SST según normativa ecuatoriana."

@@ -20,18 +20,39 @@ from app.schemas.diagnostic import (
 
 
 def _compute_stats(diagnostic: Diagnostic) -> DiagnosticOut:
-    """Adjunta estadísticas calculadas al vuelo al DiagnosticOut."""
-    answers_by_qid = {a.question_id: a for a in diagnostic.answers}
+    """Calcula las estadísticas del diagnóstico y las adjunta al DiagnosticOut."""
+
+    answers_by_qid = {
+        a.question_id: a
+        for a in diagnostic.answers
+    }
+
     all_questions = get_all_questions()
 
-    cumple = no_cumple = no_aplica = answered = 0
+    # ---------------------------------------------------------
+    # ESTADÍSTICAS GENERALES
+    # ---------------------------------------------------------
+    cumple = 0
+    no_cumple = 0
+    no_aplica = 0
+    answered = 0
+
     sections_map: dict[str, DiagnosticSectionResult] = {}
 
+    # ---------------------------------------------------------
+    # CREAR ESTADÍSTICAS POR SECCIÓN
+    #
+    # Estructura:
+    # SECTIONS
+    #   └── questions
+    # ---------------------------------------------------------
     for section in SECTIONS:
+        questions = section.get("questions", [])
+
         sections_map[section["id"]] = DiagnosticSectionResult(
             section_id=section["id"],
             section_name=section["name"],
-            total=len(section["questions"]),
+            total=len(questions),
             cumple=0,
             no_cumple=0,
             no_aplica=0,
@@ -39,35 +60,80 @@ def _compute_stats(diagnostic: Diagnostic) -> DiagnosticOut:
             percent=0.0,
         )
 
+    # ---------------------------------------------------------
+    # PROCESAR RESPUESTAS
+    # ---------------------------------------------------------
     for q in all_questions:
         ans = answers_by_qid.get(q["id"])
         sec = sections_map[q["section_id"]]
 
         if ans is None:
             sec.sin_respuesta += 1
+
         elif ans.answer == AnswerValueEnum.CUMPLE:
             cumple += 1
             answered += 1
             sec.cumple += 1
+
         elif ans.answer == AnswerValueEnum.NO_CUMPLE:
             no_cumple += 1
             answered += 1
             sec.no_cumple += 1
+
         elif ans.answer == AnswerValueEnum.NO_APLICA:
             no_aplica += 1
             answered += 1
             sec.no_aplica += 1
 
-    total_q = 96
+    # ---------------------------------------------------------
+    # TOTAL DE PREGUNTAS
+    # ---------------------------------------------------------
+    total_q = len(all_questions)
+
+    # No aplica no afecta el porcentaje de cumplimiento
     applicable = total_q - no_aplica
-    compliance_percent = round((cumple / applicable) * 100, 1) if applicable > 0 else 0.0
-    progress_percent = round((answered / total_q) * 100, 1)
 
+    compliance_percent = (
+        round((cumple / applicable) * 100, 1)
+        if applicable > 0
+        else 0.0
+    )
+
+    # ---------------------------------------------------------
+    # PROGRESO
+    #
+    # Incluye Cumple + No cumple + No aplica
+    # ---------------------------------------------------------
+    progress_percent = (
+        round((answered / total_q) * 100, 1)
+        if total_q > 0
+        else 0.0
+    )
+
+    # ---------------------------------------------------------
+    # PORCENTAJE DE CUMPLIMIENTO POR SECCIÓN
+    #
+    # Fórmula:
+    # Cumple / (Cumple + No cumple) * 100
+    #
+    # No aplica NO penaliza el porcentaje.
+    # Sin respuesta tampoco entra en la evaluación.
+    # ---------------------------------------------------------
     for sec in sections_map.values():
-        applicable_sec = sec.total - sec.no_aplica
-        sec.percent = round((sec.cumple / applicable_sec) * 100, 1) if applicable_sec > 0 else 0.0
 
+        applicable_sec = sec.cumple + sec.no_cumple
+
+        sec.percent = (
+            round((sec.cumple / applicable_sec) * 100, 1)
+            if applicable_sec > 0
+            else 0.0
+        )
+
+    # ---------------------------------------------------------
+    # CONSTRUIR RESPUESTA
+    # ---------------------------------------------------------
     out = DiagnosticOut.model_validate(diagnostic)
+
     out.answered = answered
     out.cumple = cumple
     out.no_cumple = no_cumple
@@ -75,28 +141,44 @@ def _compute_stats(diagnostic: Diagnostic) -> DiagnosticOut:
     out.progress_percent = progress_percent
     out.compliance_percent = compliance_percent
     out.sections = list(sections_map.values())
+
     return out
 
 
 def _compute_list_stats(diagnostic: Diagnostic) -> DiagnosticListItem:
     answers_by_qid = {a.question_id: a for a in diagnostic.answers}
+
     cumple = no_aplica = answered = 0
-    for q in get_all_questions():
+
+    all_questions = get_all_questions()
+
+    for q in all_questions:
         ans = answers_by_qid.get(q["id"])
+
         if ans:
             answered += 1
+
             if ans.answer == AnswerValueEnum.CUMPLE:
                 cumple += 1
+
             elif ans.answer == AnswerValueEnum.NO_APLICA:
                 no_aplica += 1
 
-    applicable = 96 - no_aplica
-    compliance_percent = round((cumple / applicable) * 100, 1) if applicable > 0 else 0.0
+    total_q = len(all_questions)
+    applicable = total_q - no_aplica
+
+    compliance_percent = (
+        round((cumple / applicable) * 100, 1)
+        if applicable > 0
+        else 0.0
+    )
+
     item = DiagnosticListItem.model_validate(diagnostic)
+
     item.answered = answered
     item.compliance_percent = compliance_percent
-    return item
 
+    return item
 
 def _load_diagnostic(db: Session, diagnostic_id: int) -> Optional[Diagnostic]:
     stmt = (

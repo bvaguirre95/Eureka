@@ -59,8 +59,29 @@ def create_diagnostic(
     current_user: User = Depends(require_permission("documents.upload")),
 ):
     _check_access(db, current_user, company_id)
-    _get_company_or_404(db, company_id)
-    return crud_diag.create_diagnostic(db, company_id, diag_in, current_user.id)
+    company = _get_company_or_404(db, company_id)
+
+    # Generar número automático usando el sistema de secuencias
+    # Scope: company + year → reinicia cada año, independiente por empresa
+    try:
+        from app.services.sequence_engine import SequenceEngine
+        inspection_number = SequenceEngine.next(
+            db=db,
+            code="diagnostic",
+            context={},
+            scope={"company": company_id},
+        )
+    except Exception:
+        # Si falla el engine (ej. secuencia no creada), no bloquear la creación
+        inspection_number = None
+
+    # Inyectar el número generado antes de crear
+    diag_data = diag_in.model_dump()
+    if inspection_number:
+        diag_data["inspection_number"] = inspection_number
+
+    from app.schemas.diagnostic import DiagnosticCreate as DC
+    return crud_diag.create_diagnostic(db, company_id, DC(**diag_data), current_user.id)
 
 
 @router.get("/{diagnostic_id}", response_model=DiagnosticOut)

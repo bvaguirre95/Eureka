@@ -131,6 +131,7 @@ export const DiagnosticFormPage = () => {
   const [generalData, setGeneralData] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingPdf, setLoadingPdf] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const saveTimer = useRef(null);
 
@@ -201,6 +202,30 @@ export const DiagnosticFormPage = () => {
     setGeneralData(newGeneral);
     scheduleAutoSave(answers, newGeneral);
   };
+  const handleDownloadPdf = async () => {
+  if (loadingPdf) return;
+
+  setLoadingPdf(true);
+
+  try {
+    await diagnosticService.downloadPdf(
+      companyId,
+      diagnosticId,
+      `diagnostico_${diag.inspection_number || diagnosticId}.pdf`
+    );
+  } catch (err) {
+    console.error("Error descargando PDF:", err);
+
+    Swal.fire({
+      icon: "error",
+      title: "No se pudo generar el informe",
+      text: err.response?.data?.detail || "Ocurrió un error al generar el PDF.",
+      confirmButtonColor: "#16a34a",
+    });
+  } finally {
+    setLoadingPdf(false);
+  }
+};
 
   const handleComplete = async () => {
     const result = await Swal.fire({
@@ -276,12 +301,23 @@ export const DiagnosticFormPage = () => {
               </>
             )}
             <Button
-              onClick={() => diagnosticService.downloadPdf(companyId, diagnosticId,
-                `diagnostico_${diag.inspection_number || diagnosticId}.pdf`)}
-              variant="outline" className="text-sm"
-            >
-              <Download className="w-4 h-4 mr-1.5" /> PDF
-            </Button>
+                onClick={handleDownloadPdf}
+                disabled={loadingPdf}
+                variant="outline"
+                className="text-sm"
+              >
+                {loadingPdf ? (
+                  <>
+                    <span className="mr-1.5 h-4 w-4 border-2 border-gray-300 border-t-green-600 rounded-full animate-spin" />
+                    Generando PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-1.5" />
+                    PDF
+                  </>
+                )}
+              </Button>
           </div>
         </div>
 
@@ -387,7 +423,24 @@ const GeneralDataForm = ({ data, onChange, disabled }) => {
           <ClipboardList className="w-4 h-4 text-green-600" /> Datos de inspección
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="N° Inspección"><Input {...f("inspection_number")} placeholder="INS-2026-001" /></Field>
+          <Field label="N° Diagnóstico">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-3 py-2 bg-green-50 border border-green-200
+                rounded-lg text-sm font-mono font-semibold text-green-800 select-all">
+                {data.inspection_number || (
+                  <span className="text-gray-400 font-normal font-sans italic">
+                    Se asignará automáticamente al crear
+                  </span>
+                )}
+              </div>
+              {data.inspection_number && (
+                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1
+                  rounded-full font-medium whitespace-nowrap">
+                  ⚡ Auto
+                </span>
+              )}
+            </div>
+          </Field>
           <Field label="Fecha">
             <Input type="date" value={data.inspection_date?.slice(0,10) || ""}
               onChange={v => onChange("inspection_date", v)} disabled={disabled} />

@@ -116,8 +116,10 @@ export const DiagnosticListPage = () => {
                     <ClipboardList className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">
-                      {d.inspection_number || `Diagnóstico #${d.id}`}
+                    <p className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                      <span className="font-mono text-green-700">
+                        {d.inspection_number || `#${d.id}`}
+                      </span>
                     </p>
                     <p className="text-xs text-gray-400">
                       {d.diagnostic_type === "inspeccion" ? "Inspección" : "Reinspección"}

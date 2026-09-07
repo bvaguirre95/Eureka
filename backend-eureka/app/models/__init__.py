@@ -27,6 +27,10 @@ from app.models.geritra import (  # noqa: F401
 )
 from app.models.inspection_template import InspectionTemplate, TemplateSourceEnum  # noqa: F401
 from app.models.document_alert import DocumentAlertConfig, DocumentAlertLog  # noqa: F401
+from app.models.worker import (  # noqa: F401
+    Worker, WorkerPositionHistory,
+    WorkerStatusEnum, DocTypeEnum, GenderEnum, ContractTypeEnum,
+)
 __all__ = [
     "Base", "Organization", "OrgTypeEnum",
     "Permission", "Role", "role_permissions",
@@ -44,4 +48,6 @@ __all__ = [
     "RiskMatrix", "RiskMatrixRow", "RiskLevel", "MatrixStatus",
     "ControlType", "ActionStatus", "InspectionTemplate", "TemplateSourceEnum",
     "DocumentAlertConfig", "DocumentAlertLog",
+    "Worker", "WorkerPositionHistory",
+    "WorkerStatusEnum", "DocTypeEnum", "GenderEnum", "ContractTypeEnum",
 ]

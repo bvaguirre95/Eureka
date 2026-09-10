@@ -21,8 +21,12 @@ class Company(Base):
     ruc = Column(String(13), unique=True, index=True, nullable=False)
     razon_social = Column(String(200), nullable=False)
     nombre_comercial = Column(String(200), nullable=True)
-    company_code = Column(String(20), nullable=True, index=True)  # "MET", "ABC" — usado en secuencias
+    company_code = Column(String(20), nullable=True, index=True)
     industria = Column(String(100), nullable=True)
+    # Tipo de empresa: 'publica' | 'privada' — requerido para diagnóstico
+    company_type = Column(String(20), nullable=True)
+    # Actividad económica CIIU — requerido para diagnóstico
+    actividad_economica = Column(String(200), nullable=True)
     num_trabajadores = Column(Integer, nullable=False, default=0)
 
     direccion = Column(String(255), nullable=True)

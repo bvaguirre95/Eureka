@@ -10,8 +10,10 @@ class CompanyBase(BaseModel):
     ruc: str
     razon_social: str
     nombre_comercial: Optional[str] = None
-    company_code: Optional[str] = None      # "MET", "ABC" — usado en secuencias
+    company_code: Optional[str] = None
     industria: Optional[str] = None
+    company_type: Optional[str] = None          # 'publica' | 'privada'
+    actividad_economica: Optional[str] = None   # CIIU — para diagnóstico
     num_trabajadores: int = 0
     direccion: Optional[str] = None
     ciudad: Optional[str] = None
@@ -51,6 +53,8 @@ class CompanyUpdate(BaseModel):
     nombre_comercial: Optional[str] = None
     company_code: Optional[str] = None
     industria: Optional[str] = None
+    company_type: Optional[str] = None
+    actividad_economica: Optional[str] = None
     num_trabajadores: Optional[int] = None
     direccion: Optional[str] = None
     ciudad: Optional[str] = None

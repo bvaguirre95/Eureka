@@ -32,6 +32,11 @@ def generate_periods(periodicity: PeriodicityEnum, year: int):
         due = datetime(year, 12, 31, tzinfo=timezone.utc)
         return [(str(year), f"Año {year}", due)]
 
+    if periodicity == PeriodicityEnum.BIANUAL:
+        # Vence 2 años después del período seleccionado
+        due = datetime(year + 2, 12, 31, tzinfo=timezone.utc)
+        return [(str(year), f"Año {year} (bianual)", due)]
+
     if periodicity == PeriodicityEnum.MENSUAL:
         periods = []
         for month in range(1, 13):

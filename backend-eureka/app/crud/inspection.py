@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+from fastapi import HTTPException
 from slugify import slugify
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -260,14 +261,31 @@ def update_inspection_type(db: Session, itype: InspectionType,
         db.flush()
         for idx, f in enumerate(type_in.fields):
             key = f.field_key or slugify(f.name, separator="_")
-            raw_ft    = str(f.field_type).lower() if f.field_type else "texto"
-            raw_scope = str(getattr(f, "scope", "matriz")).lower()
+            raw_ft = (
+                f.field_type.value
+                if hasattr(f.field_type, "value")
+                else str(f.field_type)
+            ).lower()
+
+            raw_scope = getattr(f, "scope", "matriz")
+
+            raw_scope = (
+                raw_scope.value
+                if hasattr(raw_scope, "value")
+                else str(raw_scope)
+            ).lower()
+
             try:
-                ft_enum    = FieldTypeEnum(raw_ft)
+                ft_enum = FieldTypeEnum(raw_ft)
                 scope_enum = FieldScopeEnum(raw_scope)
-            except ValueError:
-                ft_enum    = FieldTypeEnum.TEXTO
-                scope_enum = FieldScopeEnum.MATRIZ
+            except ValueError as e:
+                print("ERROR CON ENUMS")
+                print("raw_ft:", repr(raw_ft))
+                print("raw_scope:", repr(raw_scope))
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Valor inválido: field_type={raw_ft}, scope={raw_scope}"
+                )
             db.add(InspectionTypeField(
                 inspection_type_id=itype.id, name=f.name, field_key=key,
                 field_type=ft_enum, options=f.options,

@@ -9,9 +9,10 @@ from app.database import Base
 
 
 class PeriodicityEnum(str, enum.Enum):
-    UNICO = "unico"
-    ANUAL = "anual"
-    MENSUAL = "mensual"
+    UNICO     = "unico"
+    ANUAL     = "anual"
+    BIANUAL   = "bianual"    # cada 2 años
+    MENSUAL   = "mensual"
     BIMESTRAL = "bimestral"
 
 

@@ -61,24 +61,43 @@ def create_diagnostic(
     _check_access(db, current_user, company_id)
     company = _get_company_or_404(db, company_id)
 
-    # Generar número automático usando el sistema de secuencias
-    # Scope: company + year → reinicia cada año, independiente por empresa
+    # Generar número automático
     try:
         from app.services.sequence_engine import SequenceEngine
         inspection_number = SequenceEngine.next(
-            db=db,
-            code="diagnostic",
-            context={},
+            db=db, code="diagnostic", context={},
             scope={"company": company_id},
         )
     except Exception:
-        # Si falla el engine (ej. secuencia no creada), no bloquear la creación
         inspection_number = None
 
-    # Inyectar el número generado antes de crear
+    from datetime import date, datetime, timezone
+    today = date.today().isoformat()
+
+    # Pre-poblar con datos de la empresa y fecha actual
     diag_data = diag_in.model_dump()
     if inspection_number:
         diag_data["inspection_number"] = inspection_number
+
+    # Fecha actual si no se indicó
+    if not diag_data.get("inspection_date"):
+        diag_data["inspection_date"] = datetime.now(timezone.utc).isoformat()
+
+    # Datos de la empresa si no vienen del frontend
+    if not diag_data.get("razon_social"):
+        diag_data["razon_social"] = company.razon_social
+    if not diag_data.get("ruc"):
+        diag_data["ruc"] = company.ruc
+    if not diag_data.get("employer_name"):
+        diag_data["employer_name"] = company.razon_social
+    if not diag_data.get("phone") and hasattr(company, "telefono"):
+        diag_data["phone"] = company.telefono or None
+    if not diag_data.get("email") and hasattr(company, "email_contacto"):
+        diag_data["email"] = company.email_contacto or None
+    if not diag_data.get("workplace_address") and hasattr(company, "direccion"):
+        diag_data["workplace_address"] = company.direccion or None
+    if not diag_data.get("total_workers") and hasattr(company, "num_trabajadores"):
+        diag_data["total_workers"] = company.num_trabajadores or 0
 
     from app.schemas.diagnostic import DiagnosticCreate as DC
     return crud_diag.create_diagnostic(db, company_id, DC(**diag_data), current_user.id)

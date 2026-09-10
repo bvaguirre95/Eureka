@@ -40,7 +40,7 @@ def _img_b64(path: str, fallback_b64: str = "") -> str:
 # Mapa de campos a columnas fijas de la MATRIZ
 # field_key → columna en la tabla (para reconocer campos especiales)
 FIXED_COLS = [
-    ("num_extintor",   "N° de Extintor",          "txt",   "30px"),
+    ("n_de_extintor",   "N° de Extintor",          "txt",   "30px"),
     ("tipo_de_extintor", "Tipo de Extintor",         "txt",   "40px"),
     ("clase_de_agente_extintor",   "Clase de Agente Extintor", "txt",   "40px"),
     ("capacidad_lb",      "Capacidad (Lb)",            "txt",   "35px"),
@@ -55,7 +55,7 @@ FIXED_COLS = [
     ("manija",         "Manija",                    "check", "30px"),
     ("manguera",       "Manguera",                  "check", "30px"),
     ("pintura",        "Pintura",                   "check", "30px"),
-    ("senalizacion",   "Señalización/Demarcación",  "check2","30px"),
+    ("senalizacion_demarcacion",   "Señalización/Demarcación",  "check2","30px"),
 ]
 # check  → S/N subcolumnas (Bueno/Malo)
 # check2 → S/N subcolumnas (Sí/No)
@@ -130,7 +130,7 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
             gv("manija") == "M",
             gv("manguera") == "M",
             gv("pintura") == "M",
-            gv("senalizacion") == "N",
+            gv(" senalizacion_demarcacion") == "N",
         ])
         tr_cls = "finding" if (cond_bad or record.has_finding) else ""
         obs_val = gv("observaciones") or ""
@@ -138,7 +138,7 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
         matrix_rows += f"""
         <tr class="{tr_cls}">
           <td class="c">{i}</td>
-          <td class="c">{gv('num_extintor') or f'00{i}'}</td>
+          <td class="c">{gv('n_de_extintor') or f'00{i}'}</td>
           <td class="c">{gv('tipo_de_extintor')}</td>
           <td class="c">{gv('clase_de_agente_extintor')}</td>
           <td class="c">{gv('capacidad_lb')}</td>
@@ -152,7 +152,7 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
           {_x(gv('manija'),'B')}{_x(gv('manija'),'M')}
           {_x(gv('manguera'),'B')}{_x(gv('manguera'),'M')}
           {_x(gv('pintura'),'B')}{_x(gv('pintura'),'M')}
-          {_x(gv('senalizacion'),'S')}{_x(gv('senalizacion'),'N')}
+          {_x(gv('senalizacion_demarcacion'),'S')}{_x(gv('senalizacion_demarcacion'),'N')}
         </tr>"""
         if obs_val:
             matrix_rows += f'<tr class="{tr_cls}"><td colspan="25" class="obs">Obs. ítem {i}: {obs_val}</td></tr>'
@@ -180,9 +180,9 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
         num_extintor = a.item_ref or "—"
 
         for record in insp.records:
-            if record.id == a.record_id or _get_val(record, "num_extintor") == a.item_ref:
+            if record.id == a.record_id or _get_val(record, "n_de_extintor") == a.item_ref:
                 ubic      = _get_val(record, "ubicacion")
-                num_ext   = _get_val(record, "num_extintor")
+                num_ext   = _get_val(record, "n_de_extintor")
                 tipo_val  = _get_val(record, "tipo_de_extintor")
                 clase_val = _get_val(record, "clase_de_agente_extintor")
                 cap_val   = _get_val(record, "capacidad_lb")
@@ -393,6 +393,12 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
   .page-break {{ page-break-before: always; }}
   .matriz {{ page: matriz; }}
   .informe {{ page: informe; }}
+
+  /* Justificar el texto del cuerpo del informe sin afectar tablas ni portada */
+  .informe p,
+  .informe li {{
+    text-align: justify;
+  }}
 </style>
 </head>
 <body>

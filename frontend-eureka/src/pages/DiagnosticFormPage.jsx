@@ -9,6 +9,7 @@ import { DashboardLayout } from "../components/layout/DashboardLayout";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import diagnosticService from "../services/diagnostic.service";
+import companyService from "../services/company.service";
 import { SECTIONS_DATA } from "../data/anexo1Sections";
 
 // ---------- helpers ----------
@@ -131,7 +132,6 @@ export const DiagnosticFormPage = () => {
   const [generalData, setGeneralData] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [loadingPdf, setLoadingPdf] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const saveTimer = useRef(null);
 
@@ -148,12 +148,39 @@ export const DiagnosticFormPage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await diagnosticService.get(companyId, diagnosticId);
+      const [data, company] = await Promise.all([
+        diagnosticService.get(companyId, diagnosticId),
+        companyService.getCompany(companyId),
+      ]);
       setDiag(data);
       const ans = {};
       data.answers.forEach(a => { ans[a.question_id] = { answer: a.answer, observation: a.observation || "" }; });
       setAnswers(ans);
       const { answers: _a, sections: _s, ...general } = data;
+
+      // Fecha hoy por defecto si está vacía
+      if (!general.inspection_date) {
+        general.inspection_date = new Date().toISOString().slice(0, 10);
+      }
+
+      // Pre-poblar con datos de la empresa si los campos están vacíos
+      if (!general.razon_social   && company?.razon_social)     general.razon_social    = company.razon_social;
+      if (!general.ruc            && company?.ruc)              general.ruc             = company.ruc;
+      if (!general.employer_name  && company?.razon_social)     general.employer_name   = company.razon_social;
+      if (!general.phone          && company?.telefono)         general.phone           = company.telefono;
+      if (!general.email          && company?.email_contacto)   general.email           = company.email_contacto;
+      if (!general.workplace_address && company?.direccion)     general.workplace_address = company.direccion;
+      if (!general.economic_activity && company?.actividad_economica)
+                                                                general.economic_activity = company.actividad_economica;
+      // Trabajadores: desde el diagnóstico o desde la empresa
+      if (!general.total_workers) {
+        general.total_workers = data.company_num_trabajadores || company?.num_trabajadores || 0;
+      }
+      // Tipo de empresa: pública o privada desde la empresa si existe
+      if (!general.company_type && company?.company_type) {
+        general.company_type = company.company_type;
+      }
+
       setGeneralData(general);
     } catch { /**/ } finally { setLoading(false); }
   }, [companyId, diagnosticId]);
@@ -202,39 +229,60 @@ export const DiagnosticFormPage = () => {
     setGeneralData(newGeneral);
     scheduleAutoSave(answers, newGeneral);
   };
-  const handleDownloadPdf = async () => {
-  if (loadingPdf) return;
-
-  setLoadingPdf(true);
-
-  try {
-    await diagnosticService.downloadPdf(
-      companyId,
-      diagnosticId,
-      `diagnostico_${diag.inspection_number || diagnosticId}.pdf`
-    );
-  } catch (err) {
-    console.error("Error descargando PDF:", err);
-
-    Swal.fire({
-      icon: "error",
-      title: "No se pudo generar el informe",
-      text: err.response?.data?.detail || "Ocurrió un error al generar el PDF.",
-      confirmButtonColor: "#16a34a",
-    });
-  } finally {
-    setLoadingPdf(false);
-  }
-};
 
   const handleComplete = async () => {
+    // Validar campos obligatorios de datos generales
+    const requiredFields = [
+      { key: "inspection_date",   label: "Fecha de inspección"        },
+      { key: "razon_social",      label: "Razón social"               },
+      { key: "ruc",               label: "RUC"                        },
+      { key: "employer_name",     label: "Empleador"                  },
+      { key: "company_type",      label: "Tipo de empresa"            },
+      { key: "workplace_address", label: "Dirección del centro de trabajo" },
+    ];
+    const missing = requiredFields.filter(f =>
+      !generalData[f.key] || String(generalData[f.key]).trim() === ""
+    );
+    if (missing.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Completa los datos generales",
+        html: `<p class="text-sm text-gray-600 mb-2">Los siguientes campos son obligatorios:</p>
+          <ul class="text-sm text-left space-y-1">
+            ${missing.map(f => `<li class="text-red-600">• ${f.label}</li>`).join("")}
+          </ul>`,
+        confirmButtonColor: "#16a34a",
+      });
+      setActiveTab("general");
+      return;
+    }
+
+    // Validar que hay al menos alguna respuesta
+    const answeredCount = Object.values(answers).filter(a => a.answer).length;
+    if (answeredCount === 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Sin respuestas registradas",
+        text: "Completa al menos algunas preguntas antes de marcar el diagnóstico como completado.",
+        confirmButtonColor: "#16a34a",
+      });
+      return;
+    }
+
     const result = await Swal.fire({
-      icon: "question", title: "¿Marcar como completado?",
-      text: "El diagnóstico quedará cerrado. Podrás seguir viéndolo y descargarlo.",
-      showCancelButton: true, confirmButtonText: "Completar",
-      cancelButtonText: "Cancelar", confirmButtonColor: "#16a34a",
+      icon: "question",
+      title: "¿Marcar como completado?",
+      html: `<p class="text-sm text-gray-600">El diagnóstico quedará cerrado.</p>
+        <p class="text-sm text-gray-500 mt-1">Respondidas: <strong>${answeredCount}</strong> de <strong>${
+          Object.keys(answers).length || "—"
+        }</strong> preguntas</p>`,
+      showCancelButton: true,
+      confirmButtonText: "Completar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#16a34a",
     });
     if (!result.isConfirmed) return;
+
     await doSave({ ...answers }, { ...generalData, status: "completado" }, false);
     await load();
     Swal.fire({ icon: "success", title: "Diagnóstico completado", timer: 1500, showConfirmButton: false });
@@ -301,23 +349,12 @@ export const DiagnosticFormPage = () => {
               </>
             )}
             <Button
-                onClick={handleDownloadPdf}
-                disabled={loadingPdf}
-                variant="outline"
-                className="text-sm"
-              >
-                {loadingPdf ? (
-                  <>
-                    <span className="mr-1.5 h-4 w-4 border-2 border-gray-300 border-t-green-600 rounded-full animate-spin" />
-                    Generando PDF...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4 mr-1.5" />
-                    PDF
-                  </>
-                )}
-              </Button>
+              onClick={() => diagnosticService.downloadPdf(companyId, diagnosticId,
+                `diagnostico_${diag.inspection_number || diagnosticId}.pdf`)}
+              variant="outline" className="text-sm"
+            >
+              <Download className="w-4 h-4 mr-1.5" /> PDF
+            </Button>
           </div>
         </div>
 

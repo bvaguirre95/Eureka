@@ -77,6 +77,8 @@ class DiagnosticOut(DiagnosticBase):
     created_at: datetime
     updated_at: datetime
     answers: List[DiagnosticAnswerOut] = []
+    # Campo adicional: trabajadores de la empresa (para pre-poblar en el form)
+    company_num_trabajadores: Optional[int] = None
     # Stats calculados al vuelo
     total_questions: int = 96
     answered: int = 0

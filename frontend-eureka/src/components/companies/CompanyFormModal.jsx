@@ -41,7 +41,8 @@ const NIVEL_COLORS = {
 
 const emptyForm = {
   ruc: "", razon_social: "", nombre_comercial: "", company_code: "",
-  industria: "", num_trabajadores: 0, direccion: "", ciudad: "",
+  industria: "", company_type: "", actividad_economica: "",
+  num_trabajadores: 0, direccion: "", ciudad: "",
   telefono: "", email_contacto: "", is_active: true,
   descripcion: "", intro_inspeccion: "",
   geritra_config: { ...DEFAULT_GERITRA },
@@ -82,8 +83,10 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
         razon_social:      company.razon_social     || "",
         nombre_comercial:  company.nombre_comercial || "",
         company_code:      company.company_code     || "",
-        industria:         company.industria        || "",
-        num_trabajadores:  company.num_trabajadores || 0,
+        industria:           company.industria           || "",
+        company_type:        company.company_type        || "",
+        actividad_economica: company.actividad_economica || "",
+        num_trabajadores:    company.num_trabajadores    || 0,
         direccion:         company.direccion        || "",
         ciudad:            company.ciudad           || "",
         telefono:          company.telefono         || "",
@@ -185,8 +188,10 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
         razon_social:     form.razon_social.trim(),
         nombre_comercial: form.nombre_comercial.trim() || null,
         company_code:     form.company_code.trim().toUpperCase() || null,
-        industria:        form.industria.trim() || null,
-        num_trabajadores: Number(form.num_trabajadores),
+        industria:          form.industria.trim()           || null,
+        company_type:       form.company_type               || null,
+        actividad_economica: form.actividad_economica.trim() || null,
+        num_trabajadores:   Number(form.num_trabajadores),
         direccion:        form.direccion.trim() || null,
         ciudad:           form.ciudad.trim() || null,
         telefono:         form.telefono.trim() || null,
@@ -332,6 +337,25 @@ export const CompanyFormModal = ({ open, onClose, company, onSaved }) => {
                   <label className={labelCls}>Industria</label>
                   <input value={form.industria} onChange={e => set("industria", e.target.value)}
                     placeholder="Ej: Manufactura, Alimentos..." className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>
+                    Tipo de empresa <span className="text-red-400">*</span>
+                  </label>
+                  <select value={form.company_type}
+                    onChange={e => set("company_type", e.target.value)}
+                    className={inputCls}>
+                    <option value="">— Seleccionar —</option>
+                    <option value="publica">Pública</option>
+                    <option value="privada">Privada</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Actividad económica (CIIU)</label>
+                  <input value={form.actividad_economica}
+                    onChange={e => set("actividad_economica", e.target.value)}
+                    placeholder="Ej: G4711 - Venta al por menor en comercios no especializados..."
+                    className={inputCls} />
                 </div>
                 <div>
                   <label className={labelCls}>Ciudad</label>

@@ -26,6 +26,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     role_id: int
+    organization_id: Optional[int] = None 
     company_ids: List[int] = []
 
     @field_validator("password")

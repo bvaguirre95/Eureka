@@ -38,9 +38,19 @@ def create_new_user(
     if get_user_by_email(db, user_in.email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya existe un usuario con ese email")
     try:
-        return crud_user.create_user(db, user_in, current_user.organization_id)
+        org_id = (
+            user_in.organization_id
+            if current_user.is_platform_admin
+            else current_user.organization_id
+        )
+        if current_user.is_platform_admin and not org_id:
+            raise HTTPException(
+                status_code=400,
+                detail="El super-admin debe especificar una organización para el nuevo usuario",
+            )
+        return crud_user.create_user(db, user_in, org_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/{user_id}", response_model=UserOut)

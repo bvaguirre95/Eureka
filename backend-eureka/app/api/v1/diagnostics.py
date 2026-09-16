@@ -142,7 +142,6 @@ def delete_diagnostic(
     diag = _get_diag_or_404(db, diagnostic_id, company_id)
     crud_diag.delete_diagnostic(db, diag)
 
-
 @router.get("/{diagnostic_id}/pdf")
 def download_pdf(
     company_id: int,
@@ -151,12 +150,27 @@ def download_pdf(
     current_user: User = Depends(require_permission("documents.view")),
 ):
     _check_access(db, current_user, company_id)
-    _get_diag_or_404(db, diagnostic_id, company_id)
-    diag_out = crud_diag.get_diagnostic(db, diagnostic_id)
-    company = _get_company_or_404(db, company_id)
+    company   = _get_company_or_404(db, company_id)
+    diag_out  = crud_diag.get_diagnostic(db, diagnostic_id)
+    if not diag_out or diag_out.company_id != company_id:
+        raise HTTPException(404, "Diagnóstico no encontrado")
+
+    # Nombre del técnico que elaboró el diagnóstico
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import select
+    from app.models.diagnostic import Diagnostic
+    from app.models.user import User as UserModel
+    diag_raw = db.execute(
+        select(Diagnostic)
+        .options(selectinload(Diagnostic.created_by))
+        .where(Diagnostic.id == diagnostic_id)
+    ).scalar_one_or_none()
+    elaborado_por = "—"
+    if diag_raw and diag_raw.created_by:
+        elaborado_por = diag_raw.created_by.full_name or diag_raw.created_by.email
 
     from app.core.pdf_diagnostic import generate_diagnostic_pdf
-    pdf_bytes = generate_diagnostic_pdf(diag_out, company)
+    pdf_bytes = generate_diagnostic_pdf(diag_out, company, elaborado_por=elaborado_por)
     filename = f"diagnostico_anexo1_{diagnostic_id}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),

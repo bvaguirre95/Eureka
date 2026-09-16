@@ -16,7 +16,7 @@ const PAGE_SIZE = 20;
 
 export const UsersPage = () => {
   const { user, hasPermission } = useAuth();
-  const { selectedOrgId } = useOrganization();
+  const { organizations, selectedOrgId } = useOrganization();
   const isPlatformAdmin = !user?.organization;
   const canCreate = hasPermission("users.create");
   const canEdit = hasPermission("users.edit");
@@ -248,6 +248,9 @@ export const UsersPage = () => {
         user={editingUser}
         roles={roles}
         onSaved={loadUsers}
+        isPlatformAdmin={isPlatformAdmin}        // ← AGREGAR
+        organizations={organizations}            // ← AGREGAR
+        selectedOrgId={selectedOrgId}            // ← AGREGAR
       />
     </DashboardLayout>
   );

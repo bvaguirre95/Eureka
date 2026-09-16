@@ -49,7 +49,13 @@ export const InspectionTypesPage = () => {
     if (!r.isConfirmed) return;
     try { await inspectionService.deactivateType(orgId, t.id); load(); }
     catch (err) {
-      Swal.fire({ icon: "error", title: "Error", text: err.response?.data?.detail, confirmButtonColor: "#16a34a" });
+      const msg = err.response?.data?.detail || "Error al guardar";
+      Swal.fire({
+        icon: "error",
+        title: err.response?.status === 409 ? "No se puede modificar" : "Error",
+        text: msg,
+        confirmButtonColor: "#16a34a",
+      });
     }
   };
 

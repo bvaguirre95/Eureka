@@ -18,11 +18,12 @@ const emptyForm = {
   password: "",
   role_id: "",
   is_active: true,
+  organization_id: "",
   companies: [], // [{ id, razon_social, ruc }]
 };
 
-export const UserFormModal = ({ open, onClose, user, roles, onSaved }) => {
-  const [form, setForm] = useState(emptyForm);
+// Cambiar la firma del componente
+export const UserFormModal = ({ open, onClose, user, roles, onSaved, isPlatformAdmin, organizations, selectedOrgId }) => {  const [form, setForm] = useState(emptyForm);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -39,6 +40,7 @@ export const UserFormModal = ({ open, onClose, user, roles, onSaved }) => {
           password: "",
           role_id: String(user.role.id),
           is_active: user.is_active,
+          organization_id: String(user.organization?.id || ""),
           companies: user.companies || [],
         });
       } else {
@@ -58,7 +60,9 @@ export const UserFormModal = ({ open, onClose, user, roles, onSaved }) => {
 
   const validate = () => {
     const newErrors = {};
-
+    if (isPlatformAdmin && !isEditing && !form.organization_id) {
+      newErrors.organization_id = "Selecciona una organización";
+    }
     if (!form.email.trim()) newErrors.email = "El email es obligatorio";
     if (!form.full_name.trim()) newErrors.full_name = "El nombre es obligatorio";
     if (!form.role_id) newErrors.role_id = "Selecciona un rol";
@@ -87,6 +91,7 @@ export const UserFormModal = ({ open, onClose, user, roles, onSaved }) => {
     try {
       const payload = {
         email: form.email.trim(),
+        organization_id: isPlatformAdmin ? (Number(form.organization_id) || null) : undefined,
         full_name: form.full_name.trim(),
         phone: form.phone.trim() || null,
         role_id: Number(form.role_id),
@@ -197,7 +202,26 @@ export const UserFormModal = ({ open, onClose, user, roles, onSaved }) => {
               <p className="text-xs text-red-600 mt-1">{errors.password}</p>
             )}
           </div>
-
+          {isPlatformAdmin && !isEditing && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Organización <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={form.organization_id}
+                onChange={e => setForm({ ...form, organization_id: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                  focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none">
+                <option value="">— Seleccionar organización —</option>
+                {(organizations || []).map(o => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+              {errors.organization_id && (
+                <p className="text-xs text-red-600 mt-1">{errors.organization_id}</p>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1.5 text-gray-700">Rol</label>
             <select

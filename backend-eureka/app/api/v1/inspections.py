@@ -80,8 +80,10 @@ def update_type(
     itype = crud_insp.get_inspection_type(db, type_id)
     if not itype or itype.organization_id != org_id:
         raise HTTPException(404, "Tipo no encontrado")
-    return crud_insp.update_inspection_type(db, itype, type_in)
-
+    try:
+        return crud_insp.update_inspection_type(db, itype, type_in)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 @router.delete("/organizations/{org_id}/inspection-types/{type_id}",
                response_model=InspectionTypeOut)

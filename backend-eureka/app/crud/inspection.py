@@ -248,44 +248,44 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
     out.field_count = len(t.fields)
     return out
 
-
 def update_inspection_type(db: Session, itype: InspectionType,
                             type_in) -> InspectionTypeOut:
     for f in ["name", "description", "icon", "periodicity", "is_active", "pdf_template", "type_code", "structure_type"]:
         v = getattr(type_in, f, None)
         if v is not None:
             setattr(itype, f, v)
+
     if type_in.fields is not None:
+        # Verificar si ya existen inspecciones de este tipo
+        from sqlalchemy import select, func
+        from app.models.inspection import Inspection
+        has_inspections = db.execute(
+            select(func.count()).select_from(Inspection)
+            .where(Inspection.inspection_type_id == itype.id)
+        ).scalar_one()
+
+        if has_inspections > 0:
+            # Bloquear modificación de campos — lanzar error claro
+            raise ValueError(
+                f"Este tipo de inspección tiene {has_inspections} inspección(es) registrada(s). "
+                "No se pueden modificar los campos para preservar la integridad de los registros existentes. "
+                "Solo puedes editar el nombre, descripción, ícono y periodicidad."
+            )
+
+        # Sin inspecciones — permite modificar campos
         for old in list(itype.fields):
             db.delete(old)
         db.flush()
         for idx, f in enumerate(type_in.fields):
             key = f.field_key or slugify(f.name, separator="_")
-            raw_ft = (
-                f.field_type.value
-                if hasattr(f.field_type, "value")
-                else str(f.field_type)
-            ).lower()
-
-            raw_scope = getattr(f, "scope", "matriz")
-
-            raw_scope = (
-                raw_scope.value
-                if hasattr(raw_scope, "value")
-                else str(raw_scope)
-            ).lower()
-
+            raw_ft    = str(f.field_type).lower() if f.field_type else "texto"
+            raw_scope = str(getattr(f, "scope", "matriz")).lower()
             try:
-                ft_enum = FieldTypeEnum(raw_ft)
+                ft_enum    = FieldTypeEnum(raw_ft)
                 scope_enum = FieldScopeEnum(raw_scope)
-            except ValueError as e:
-                print("ERROR CON ENUMS")
-                print("raw_ft:", repr(raw_ft))
-                print("raw_scope:", repr(raw_scope))
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Valor inválido: field_type={raw_ft}, scope={raw_scope}"
-                )
+            except ValueError:
+                ft_enum    = FieldTypeEnum.TEXTO
+                scope_enum = FieldScopeEnum.MATRIZ
             db.add(InspectionTypeField(
                 inspection_type_id=itype.id, name=f.name, field_key=key,
                 field_type=ft_enum, options=f.options,
@@ -293,6 +293,7 @@ def update_inspection_type(db: Session, itype: InspectionType,
                 group_name=f.group_name,
                 scope=scope_enum,
             ))
+
     db.commit()
     t = _load_type(db, itype.id)
     out = InspectionTypeOut.model_validate(t)

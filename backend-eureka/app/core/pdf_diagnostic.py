@@ -45,8 +45,7 @@ def _format_date(dt) -> str:
     return dt.strftime("%d/%m/%Y")
 
 
-def generate_diagnostic_pdf(diag_out, company) -> bytes:
-
+def generate_diagnostic_pdf(diag_out, company, elaborado_por: str = "—") -> bytes:
     # =========================================================
     # MAPA DE RESPUESTAS
     # =========================================================
@@ -73,7 +72,6 @@ def generate_diagnostic_pdf(diag_out, company) -> bytes:
         if diag_out.status == "completado"
         else "Borrador"
     )
-
     # =========================================================
     # SECCIONES DE PREGUNTAS
     # =========================================================
@@ -1260,15 +1258,32 @@ def generate_diagnostic_pdf(diag_out, company) -> bytes:
 <h2 class="page-title">
   Verificación por Sección
 </h2>
-
 {sections_html}
 
+<!-- FIRMAS -->
+<div style="page-break-inside:avoid;margin-top:40px;border-top:2px solid #16a34a;padding-top:20px;">
+  <h3 style="font-size:11pt;font-weight:700;color:#374151;margin-bottom:20px;
+             text-align:center;text-transform:uppercase;letter-spacing:1px;">
+    Firmas de Responsabilidad
+  </h3>
+  <div style="display:flex;gap:40px;justify-content:space-around;margin-top:24px;">
+    <div style="flex:1;text-align:center;">
+      <div style="border-bottom:1px solid #374151;margin-bottom:8px;height:48px;"></div>
+      <p style="font-size:9pt;font-weight:700;color:#111827;margin:0;">{elaborado_por}</p>
+      <p style="font-size:8pt;color:#6b7280;margin:2px 0;">Responsable</p>
+      <p style="font-size:8pt;color:#9ca3af;margin:0;">Elaboró el diagnóstico</p>
+    </div>
+    <div style="flex:1;text-align:center;">
+      <div style="border-bottom:1px solid #374151;margin-bottom:8px;height:48px;"></div>
+      <p style="font-size:9pt;font-weight:700;color:#111827;margin:0;">&nbsp;</p>
+      <p style="font-size:8pt;color:#6b7280;margin:2px 0;">Representante Legal</p>
+      <p style="font-size:8pt;color:#9ca3af;margin:0;">{company.razon_social or '—'}</p>
+    </div>
+  </div>
+</div>
 
 </body>
-
-</html>
-"""
-
+</html>"""
     # =========================================================
     # GENERAR PDF
     # =========================================================

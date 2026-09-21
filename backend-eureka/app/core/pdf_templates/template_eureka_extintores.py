@@ -109,6 +109,7 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
     insp_nro = insp.inspection_number or "—"
     fecha_hoy = _date_short(datetime.now())
     elaborado_by = (insp.elaborated_by or "—").upper()
+
     # Logo grande para portada
     logo_html_large = (
         f'<img src="{logo_src}" style="height:;width:7.3cm;object-fit:contain">'
@@ -223,27 +224,37 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
 
     # ── Firmas HTML ──────────────────────────────────────────────────────────
     firmas_html = f"""
-    <table class="firmas">
-      <tr>
-        <td></td><td></td><td></td>
-      </tr>
-      <tr>
-        <td class="firma-label">ELABORADO POR:</td>
-        <td class="firma-label">REVISADO POR:</td>
-        <td class="firma-label">APROBADO POR:</td>
-      </tr>
-      <tr>
-        <td class="firma-name">{insp.elaborated_by or "___________________"}</td>
-        <td class="firma-name">{insp.reviewed_by or "___________________"}</td>
-        <td class="firma-name">{insp.approved_by or "___________________"}</td>
-      </tr>
-      <tr>
-        <td class="firma-role">{insp.elaborated_role or ""}</td>
-        <td class="firma-role">{insp.reviewed_role or ""}</td>
-        <td class="firma-role">{insp.approved_role or ""}</td>
-      </tr>
-    </table>"""
-
+<div class="firmas-container">
+  <table class="firmas">
+    <tr>
+      <td class="firma-espacio">
+        <!-- Espacio reservado para firma -->
+      </td>
+      <td class="firma-espacio">
+        <!-- Espacio reservado para firma -->
+      </td>
+      <td class="firma-espacio">
+        <!-- Espacio reservado para firma -->
+      </td>
+    </tr>
+    <tr>
+      <td class="firma-label">ELABORADO POR:</td>
+      <td class="firma-label">REVISADO POR:</td>
+      <td class="firma-label">APROBADO POR:</td>
+    </tr>
+    <tr>
+      <td class="firma-name">{insp.elaborated_by or "___________________"}</td>
+      <td class="firma-name">{insp.reviewed_by or "___________________"}</td>
+      <td class="firma-name">{insp.approved_by or "___________________"}</td>
+    </tr>
+    <tr>
+      <td class="firma-role">{insp.elaborated_role or ""}</td>
+      <td class="firma-role">{insp.reviewed_role or ""}</td>
+      <td class="firma-role">{insp.approved_role or ""}</td>
+    </tr>
+  </table>
+</div>
+"""
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -382,13 +393,32 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
     padding:8px 12px; font-size:8pt; margin-bottom:10px; }}
 
   /* ── FIRMAS ── */
-  table.firmas {{ width:100%; border-collapse:collapse; margin-top:24px; }}
-  table.firmas td {{ border:1px solid #000; padding:6px 8px; text-align:center;
-    font-size:8pt; width:33.3%; }}
-  table.firmas tr:first-child td {{ height:40px; border-bottom:none; }}
-  table.firmas .firma-label {{ font-weight:bold; background:#f0f0f0; }}
-  table.firmas .firma-name {{ font-weight:bold; }}
-  table.firmas .firma-role {{ color:#555; }}
+  .firmas-container {{
+       page-break-inside: avoid;
+        break-inside: avoid;
+        width: 100%;
+        margin-top: 30px;
+        page-break-before: auto;}}
+  table.firmas {{ width:100%; border-collapse:collapse; table-layout: fixed; }}
+  table.firmas td {{ border: 1px solid #000;
+      padding: 6px 8px;
+      text-align: center;
+      font-size: 8pt;
+      width: 33.3%; }}
+  table.firmas .firma-espacio {{   height: 85px;
+      border-bottom: none;
+      vertical-align: bottom;}}
+  table.firmas .firma-label {{  height: 24px;
+      font-weight: bold;
+      background: #f0f0f0; }}
+  table.firmas .firma-name {{ height:25px; font-weight:bold; }}
+  table.firmas .firma-role {{ height: 25px; color:#555; }}
+  .firmas-final {{
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-top: 30px;}}
+
+
 
   .page-break {{ page-break-before: always; }}
   .matriz {{ page: matriz; }}
@@ -520,7 +550,9 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
   <tbody>{hallazgos_matrix}</tbody>
 </table>
 
-{firmas_html}
+<div class="firmas-final">
+    {firmas_html}
+</div>
 </div>
 <!-- ##SPLIT## -->
 <div class="informe">
@@ -663,7 +695,9 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
 <h2 class="sec">9. Recomendaciones generales</h2>
 <ul>{recs_html}</ul>
 
-{firmas_html}
+<div class="firmas-final">
+    {firmas_html}
+</div>
 </div>
 </body>
 </html>"""

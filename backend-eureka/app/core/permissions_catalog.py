@@ -66,6 +66,9 @@ PERMISSIONS_CATALOG = [
     ("workers.create",     "Trabajadores", "Registrar trabajadores",          "Crear nuevos registros de trabajadores"),
     ("workers.edit",       "Trabajadores", "Editar trabajadores",             "Modificar datos laborales e identificación"),
     ("workers.deactivate", "Trabajadores", "Retirar / desactivar trabajadores","Cambiar estado a Retirado, Inactivo o Suspendido"),
+    ("epp.view",    "EPP", "Ver EPP y entregas",          "Consultar catálogo y entregas de equipos de protección"),
+    ("epp.manage",  "EPP", "Gestionar tipos y catálogo",  "Crear y editar tipos de EPP y catálogo"),
+    ("epp.deliver", "EPP", "Registrar entregas de EPP",   "Crear y actualizar entregas de EPP a trabajadores"),
     # ── NUEVO MÓDULO — plantilla para 
     # ── NUEVO MÓDULO — plantilla para copiar ──────────────────────────────────
     # ("mi_modulo.view",   "Mi Módulo", "Ver X",    "..."),

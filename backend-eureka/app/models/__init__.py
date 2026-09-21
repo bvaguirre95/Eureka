@@ -31,6 +31,7 @@ from app.models.worker import (  # noqa: F401
     Worker, WorkerPositionHistory,
     WorkerStatusEnum, DocTypeEnum, GenderEnum, ContractTypeEnum,
 )
+from app.models.epp import EppType, EppCatalog, EppDelivery, EppDeliveryStatusEnum  # noqa: F401
 __all__ = [
     "Base", "Organization", "OrgTypeEnum",
     "Permission", "Role", "role_permissions",
@@ -50,4 +51,5 @@ __all__ = [
     "DocumentAlertConfig", "DocumentAlertLog",
     "Worker", "WorkerPositionHistory",
     "WorkerStatusEnum", "DocTypeEnum", "GenderEnum", "ContractTypeEnum",
+    "EppType", "EppCatalog", "EppDelivery", "EppDeliveryStatusEnum",
 ]

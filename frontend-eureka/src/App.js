@@ -32,6 +32,8 @@ import JobPositionsPage           from "./pages/JobPositionsPage";
 import WorkersPage                from "./pages/WorkersPage";
 import WorkerDetailPage           from "./pages/WorkerDetailPage";
 import { OrganizationProvider } from "./contexts/OrganizationContext";
+import EppPage       from "./pages/EppPage";
+import EppConfigPage from "./pages/EppConfigPage";
 import "./App.css";
 
 // Wrapper reutilizable para rutas privadas con permisos
@@ -91,6 +93,10 @@ function App() {
             element={<PR perms={["workers.view"]}><WorkersPage /></PR>} />
           <Route path="/dashboard/empresas/:companyId/trabajadores/:workerId"
             element={<PR perms={["workers.view"]}><WorkerDetailPage /></PR>} />
+          <Route path="/dashboard/empresas/:companyId/epp" 
+            element={<PR perms={["epp.view"]}><EppPage /></PR>} />
+          <Route path="/dashboard/configuracion/epp"
+            element={<PR perms={["epp.manage"]}><EppConfigPage /></PR>} />
           <Route path="/dashboard/empresas/:companyId/geritra/:matrixId"
             element={<PR perms={["risks.view"]}><GeritraMatrixPage /></PR>} />
 

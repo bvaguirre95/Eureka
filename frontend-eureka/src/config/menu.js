@@ -81,6 +81,13 @@ export const MENU_ITEMS = [
         permissions: ["settings.manage.geritra"],
         enabled: true,
       },
+      {
+        label: "EPP",
+        path:  "/dashboard/configuracion/epp",
+        icon:  Shield,
+        permissions: ["epp.manage"],
+        enabled: true,
+      },
     ],
   },
   {

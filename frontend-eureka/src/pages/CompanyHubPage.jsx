@@ -240,7 +240,13 @@ export const CompanyHubPage = () => {
             onClick={() => navigate(`/dashboard/usuarios?empresa=${companyId}`)}
           />
         )}
-
+        <ModuleCard
+          icon={Shield}
+          title="EPP y Ropa de Trabajo"
+          description="Entregas de equipos de protección. Trazabilidad por trabajador con vida útil y reposición."
+          badgeColor="bg-orange-100 text-orange-700"
+          onClick={() => go("epp")}
+        />
         <ModuleCard
           icon={Shield}
           title="Accidentes e Incidentes"

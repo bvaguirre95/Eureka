@@ -26,7 +26,8 @@ from app.models.geritra import (  # noqa: F401
     ControlType, ActionStatus
 )
 from app.models.inspection_template import InspectionTemplate, TemplateSourceEnum  # noqa: F401
-from app.models.document_alert import DocumentAlertConfig, DocumentAlertLog  # noqa: F401
+from app.models.inspection_report_format import InspectionReportFormat  # noqa: F401
+from app.models.document_alert import DocumentAlertConfig, DocumentAlertLog, DocumentUploadNotification  # noqa: F401
 from app.models.worker import (  # noqa: F401
     Worker, WorkerPositionHistory,
     WorkerStatusEnum, DocTypeEnum, GenderEnum, ContractTypeEnum,
@@ -42,13 +43,13 @@ __all__ = [
     "Diagnostic", "DiagnosticAnswer", "DiagnosticStatusEnum",
     "DiagnosticTypeEnum", "AnswerValueEnum",
     "SequenceDef", "SequenceCounter", "ResetPolicyEnum",
-    "InspectionType", "InspectionTypeField", "Inspection",
+    "InspectionType", "InspectionTypeField", "Inspection", "InspectionReportFormat",
     "InspectionRecord", "InspectionFieldValue", "CorrectiveAction",
     "InspectionStatusEnum", "ActionStatusEnum", "FieldTypeEnum",
     "RiskCategory", "RiskFactorCatalog", "JobPosition",
     "RiskMatrix", "RiskMatrixRow", "RiskLevel", "MatrixStatus",
     "ControlType", "ActionStatus", "InspectionTemplate", "TemplateSourceEnum",
-    "DocumentAlertConfig", "DocumentAlertLog",
+    "DocumentAlertConfig", "DocumentAlertLog", "DocumentUploadNotification",
     "Worker", "WorkerPositionHistory",
     "WorkerStatusEnum", "DocTypeEnum", "GenderEnum", "ContractTypeEnum",
     "EppType", "EppCatalog", "EppDelivery", "EppDeliveryStatusEnum",

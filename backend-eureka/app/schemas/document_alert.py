@@ -9,6 +9,7 @@ class AlertConfigOut(BaseModel):
     days_before: str          # raw "30,15,7"
     days_list: list[int]      # [30, 15, 7] parseado
     is_enabled: bool
+    notify_on_upload: bool = True      # avisar al supervisor cuando se carga un documento
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -25,6 +26,7 @@ class AlertConfigOut(BaseModel):
 class AlertConfigUpdate(BaseModel):
     days_before: list[int]   # [30, 15, 7]
     is_enabled: bool = True
+    notify_on_upload: Optional[bool] = None   # None = no cambiar
 
     @field_validator("days_before")
     @classmethod
@@ -61,3 +63,15 @@ class AlertRunResult(BaseModel):
     errors: int
     expired_marked: int = 0
     message: str
+
+class UploadRecipientOut(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    role_name: str
+    is_default: bool = False          # preseleccionado en el diálogo de carga
+
+
+class UploadRecipientsOut(BaseModel):
+    enabled: bool = True              # False → la organización desactivó el aviso al cargar
+    recipients: list[UploadRecipientOut] = []

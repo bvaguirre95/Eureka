@@ -67,7 +67,10 @@ def create_type(
 ):
     if not current_user.is_platform_admin and current_user.organization_id != org_id:
         raise HTTPException(403, "Sin acceso a esta organización")
-    return crud_insp.create_inspection_type(db, org_id, current_user.id, type_in)
+    try:
+        return crud_insp.create_inspection_type(db, org_id, current_user.id, type_in)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/organizations/{org_id}/inspection-types/{type_id}",
@@ -434,8 +437,12 @@ def download_pdf(
     from app.core.pdf_inspection import generate_inspection_pdf
     itype = crud_insp.get_inspection_type(db, insp_out.inspection_type_id)
     template_key = getattr(itype, "pdf_template", None) or "generico"
+    # Versión del formato fijada al crear la inspección (histórico preservado).
+    # Sin formato (inspecciones previas) → flujo clásico por pdf_template.
+    insp_row = db.get(Inspection, inspection_id)
     pdf_bytes = generate_inspection_pdf(insp_out, company,
-                                        template_key=template_key, doc=doc)
+                                        template_key=template_key, doc=doc,
+                                        report_format=insp_row.report_format if insp_row else None)
 
     doc_label = {"matriz": "Matriz", "informe": "Informe"}.get(doc, "Inspeccion")
     tipo = insp_out.inspection_type_name.replace(" ", "_")

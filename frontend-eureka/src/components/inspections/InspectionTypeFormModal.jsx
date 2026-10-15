@@ -219,7 +219,7 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
   const [form, setForm] = useState({
     name: "", description: "", periodicity: "mensual",
     pdf_template: "generico", type_code: "",
-    structure_type: "matriz",
+    structure_type: "matriz", report_format_id: "",
   });
   // Campos de datos generales (scope=general) — solo para formulario y formulario_matriz
   const [generalFields, setGeneralFields] = useState([emptyField(0, "general")]);
@@ -227,6 +227,7 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
   const [matrizFields, setMatrizFields] = useState([emptyField(0, "matriz")]);
 
   const [templates, setTemplates] = useState([{ key: "generico", label: "Genérico" }]);
+  const [reportFormats, setReportFormats] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [steptemplates, setStepTemplates, ] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -249,6 +250,13 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
   }, []);
 
   useEffect(() => {
+    if (!orgId) return;
+    inspectionService.getReportFormats?.(orgId)
+      .then((data) => setReportFormats((data || []).filter((f) => f.is_active)))
+      .catch(() => {});
+  }, [orgId]);
+
+  useEffect(() => {
     if (!open) return;
     setStep(isEditing ? 2 : 1);
 
@@ -260,6 +268,7 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
         pdf_template:   typeData.pdf_template || "generico",
         type_code:      typeData.type_code    || "",
         structure_type: typeData.structure_type || "matriz",
+        report_format_id: typeData.report_format_id || "",
       });
       // Separar campos por scope
       const allFields = typeData.fields || [];
@@ -269,7 +278,7 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
       setMatrizFields(mat.length > 0  ? mat.map(fieldToState) : [emptyField(0, "matriz")]);
     } else {
       setForm({ name: "", description: "", periodicity: "mensual",
-                pdf_template: "generico", type_code: "", structure_type: "matriz" });
+                pdf_template: "generico", type_code: "", structure_type: "matriz", report_format_id: "" });
       setGeneralFields([emptyField(0, "general")]);
       setMatrizFields([emptyField(0, "matriz")]);
     }
@@ -358,6 +367,9 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
         ...form,
         type_code: form.type_code.trim().toUpperCase() || null,
         fields: allFields,
+        // Formato de informe: vacío = formato PDF clásico. Solo afecta inspecciones nuevas.
+        report_format_id: form.report_format_id ? Number(form.report_format_id) : null,
+        clear_report_format: isEditing && !form.report_format_id && !!typeData.report_format_id,
       };
       if (isEditing) await inspectionService.updateType(orgId, typeData.id, payload);
       else           await inspectionService.createType(orgId, payload);
@@ -581,6 +593,24 @@ export const InspectionTypeFormModal = ({ open, onClose, typeData, orgId, onSave
               >
                 {templates.map((t) => (
                   <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                Formato de informe
+              </label>
+              <select
+                value={form.report_format_id}
+                onChange={(e) => setForm({ ...form, report_format_id: e.target.value })}
+                className={inputCls}
+              >
+                <option value="">Clásico (según Formato PDF)</option>
+                {reportFormats.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} · v{f.version}{f.is_global ? " (genérico)" : ""}
+                  </option>
                 ))}
               </select>
             </div>

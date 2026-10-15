@@ -223,35 +223,16 @@ def generate(insp, company, doc: str = "ambos") -> bytes:
     recs_html = "".join(f"<li>{r}</li>" for r in (recs.split("\n") if recs else recs_default))
 
     # ── Firmas HTML ──────────────────────────────────────────────────────────
+    from app.core.pdf_templates.signatures import resolve_signatories, table_style
+    _sg = resolve_signatories(insp)
+    _row = lambda cls, fn: "".join(f'<td class="{cls}">{fn(x)}</td>' for x in _sg)
     firmas_html = f"""
 <div class="firmas-container">
-  <table class="firmas">
-    <tr>
-      <td class="firma-espacio">
-        <!-- Espacio reservado para firma -->
-      </td>
-      <td class="firma-espacio">
-        <!-- Espacio reservado para firma -->
-      </td>
-      <td class="firma-espacio">
-        <!-- Espacio reservado para firma -->
-      </td>
-    </tr>
-    <tr>
-      <td class="firma-label">ELABORADO POR:</td>
-      <td class="firma-label">REVISADO POR:</td>
-      <td class="firma-label">APROBADO POR:</td>
-    </tr>
-    <tr>
-      <td class="firma-name">{insp.elaborated_by or "___________________"}</td>
-      <td class="firma-name">{insp.reviewed_by or "___________________"}</td>
-      <td class="firma-name">{insp.approved_by or "___________________"}</td>
-    </tr>
-    <tr>
-      <td class="firma-role">{insp.elaborated_role or ""}</td>
-      <td class="firma-role">{insp.reviewed_role or ""}</td>
-      <td class="firma-role">{insp.approved_role or ""}</td>
-    </tr>
+  <table class="firmas" style="{table_style(len(_sg))}">
+    <tr>{_row("firma-espacio", lambda x: "")}</tr>
+    <tr>{_row("firma-label", lambda x: x["label"])}</tr>
+    <tr>{_row("firma-name", lambda x: x["name"] or "___________________")}</tr>
+    <tr>{_row("firma-role", lambda x: x["role"] or "")}</tr>
   </table>
 </div>
 """

@@ -28,6 +28,7 @@ def upsert_alert_config(
     organization_id: int,
     days_before: list[int],
     is_enabled: bool = True,
+    notify_on_upload: Optional[bool] = None,
 ) -> DocumentAlertConfig:
     """Crea o actualiza la configuración de alertas para una organización."""
     days_str = ",".join(str(d) for d in sorted(set(days_before), reverse=True))
@@ -35,11 +36,14 @@ def upsert_alert_config(
     if config:
         config.days_before = days_str
         config.is_enabled  = is_enabled
+        if notify_on_upload is not None:
+            config.notify_on_upload = notify_on_upload
     else:
         config = DocumentAlertConfig(
             organization_id=organization_id,
             days_before=days_str,
             is_enabled=is_enabled,
+            notify_on_upload=True if notify_on_upload is None else notify_on_upload,
         )
         db.add(config)
     db.commit()

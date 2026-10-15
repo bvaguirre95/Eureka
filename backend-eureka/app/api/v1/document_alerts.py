@@ -65,6 +65,7 @@ def get_config(
         days_before=config.days_before,
         days_list=config.days_list,
         is_enabled=config.is_enabled,
+        notify_on_upload=True if config.notify_on_upload is None else config.notify_on_upload,
         updated_at=getattr(config, "updated_at", None),
     )
 
@@ -82,6 +83,7 @@ def update_config(
         db, org_id,
         days_before=data.days_before,
         is_enabled=data.is_enabled,
+        notify_on_upload=data.notify_on_upload,
     )
     return AlertConfigOut(
         id=config.id,
@@ -89,6 +91,7 @@ def update_config(
         days_before=config.days_before,
         days_list=config.days_list,
         is_enabled=config.is_enabled,
+        notify_on_upload=config.notify_on_upload,
         updated_at=config.updated_at,
     )
 

@@ -49,6 +49,7 @@ const fmtDate = (iso) => {
 const AlertConfigModal = ({ open, onClose, orgId, onSaved }) => {
   const [days, setDays]       = useState([30, 7]);
   const [enabled, setEnabled] = useState(true);
+  const [notifyUpload, setNotifyUpload] = useState(true);
   const [newDay, setNewDay]   = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving]   = useState(false);
@@ -57,7 +58,7 @@ const AlertConfigModal = ({ open, onClose, orgId, onSaved }) => {
     if (!open || !orgId) return;
     setLoading(true);
     documentAlertService.getConfig(orgId)
-      .then(c => { setDays(c.days_list || [30, 7]); setEnabled(c.is_enabled); })
+      .then(c => { setDays(c.days_list || [30, 7]); setEnabled(c.is_enabled); setNotifyUpload(c.notify_on_upload ?? true); })
       .catch(() => { setDays([30, 7]); setEnabled(true); })
       .finally(() => setLoading(false));
   }, [open, orgId]);
@@ -78,7 +79,7 @@ const AlertConfigModal = ({ open, onClose, orgId, onSaved }) => {
     }
     setSaving(true);
     try {
-      await documentAlertService.updateConfig(orgId, { days_before: days, is_enabled: enabled });
+      await documentAlertService.updateConfig(orgId, { days_before: days, is_enabled: enabled, notify_on_upload: notifyUpload });
       onSaved();
       onClose();
       Swal.fire({ icon: "success", title: "Configuración guardada", timer: 1500, showConfirmButton: false });
@@ -117,6 +118,19 @@ const AlertConfigModal = ({ open, onClose, orgId, onSaved }) => {
                     enabled ? "bg-green-600" : "bg-gray-300"}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                     enabled ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Aviso al cargar documentos</p>
+                  <p className="text-xs text-gray-500">Al subir un documento, el técnico elige a qué supervisor avisar</p>
+                </div>
+                <button onClick={() => setNotifyUpload(p => !p)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    notifyUpload ? "bg-green-600" : "bg-gray-300"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    notifyUpload ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
 

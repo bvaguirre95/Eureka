@@ -15,7 +15,7 @@ DELETE /companies/{company_id}/custom-documents/{doc_id}/files/{file_id}
 import os
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -125,7 +125,9 @@ def delete_document(
 async def upload_file(
     company_id: int,
     doc_id: int,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    notify_user_ids: Optional[str] = Form(default=None),   # None=supervisores · ""=nadie · "3,5"
     file_type: str   = Form(default="principal"),
     version_label: Optional[str] = Form(default=None),
     notes: Optional[str]         = Form(default=None),
@@ -149,10 +151,18 @@ async def upload_file(
     except ValueError:
         ft = FileTypeEnum.PRINCIPAL
 
-    return crud_doc.upload_file_to_document(
+    saved = crud_doc.upload_file_to_document(
         db, doc, file.filename, file_bytes, ft,
         current_user.id, version_label, notes,
     )
+    from app.models.company import Company
+    from app.crud import document_upload_notice as notice
+    company = db.get(Company, company_id)
+    if company:
+        notice.notify_after_upload(
+            db, background_tasks, company=company, uploader=current_user, raw_ids=notify_user_ids,
+            document_name=doc.name, period_display="—", custom_document_id=doc.id)
+    return saved
 
 
 @router.get("/companies/{company_id}/custom-documents/{doc_id}/files/{file_id}/download")

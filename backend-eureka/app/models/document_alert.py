@@ -36,6 +36,8 @@ class DocumentAlertConfig(Base):
     # Días antes del vencimiento separados por coma: "30,15,7"
     days_before     = Column(String(50), nullable=False, default="30,7")
     is_enabled      = Column(Boolean, nullable=False, default=True)
+    # Aviso al supervisor cuando un técnico sube un documento (independiente de los vencimientos)
+    notify_on_upload = Column(Boolean, nullable=False, default=True, server_default="true")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(),
@@ -86,3 +88,25 @@ class DocumentAlertLog(Base):
 
     config           = relationship("DocumentAlertConfig", back_populates="logs")
     company_document = relationship("CompanyDocument")
+
+
+class DocumentUploadNotification(Base):
+    """
+    Aviso enviado cuando se carga un documento (normativo o personalizado):
+    quién lo subió, a quién se avisó y si el correo salió.
+    """
+    __tablename__ = "document_upload_notifications"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    company_id          = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"),
+                                 nullable=False, index=True)
+    company_document_id = Column(Integer, ForeignKey("company_documents.id", ondelete="CASCADE"),
+                                 nullable=True, index=True)
+    custom_document_id  = Column(Integer, ForeignKey("company_custom_documents.id", ondelete="CASCADE"),
+                                 nullable=True, index=True)
+    uploaded_by_id      = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    recipient_user_id   = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    recipient_email     = Column(String(200), nullable=False)
+    status              = Column(String(15), nullable=False, default="pendiente")  # pendiente|enviado|fallido|omitido
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at             = Column(DateTime(timezone=True), nullable=True)

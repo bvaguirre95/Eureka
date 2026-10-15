@@ -9,6 +9,7 @@ import {
   Hash,
   Home,
   Settings,
+  Shield,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -84,7 +85,7 @@ export const MENU_ITEMS = [
       {
         label: "EPP",
         path:  "/dashboard/configuracion/epp",
-        icon:  ShieldCheck,
+        icon:  Shield,
         permissions: ["epp.manage"],
         enabled: true,
       },
@@ -101,6 +102,13 @@ export const MENU_ITEMS = [
     label: "Tipos de Inspección",
     path: "/dashboard/tipos-inspeccion",
     icon: ClipboardCheck,
+    permissions: ["inspections.manage"],
+    enabled: true,
+  },
+  {
+    label: "Formatos de Informe",
+    path: "/dashboard/formatos-informe",
+    icon: FileText,
     permissions: ["inspections.manage"],
     enabled: true,
   },

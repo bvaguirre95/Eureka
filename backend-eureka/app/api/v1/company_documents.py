@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_permission
 from app.core.email_service import build_validation_email, send_email
+from app.crud import document_upload_notice as notice
+from app.schemas.document_alert import UploadRecipientOut, UploadRecipientsOut
 from app.core.config import settings
 from app.crud import company as crud_company
 from app.crud import company_document as crud_doc
@@ -125,11 +127,33 @@ def get_documents_summary(
 
 # ── POST upload ───────────────────────────────────────────────────────────────
 
+@router.get("/upload-recipients", response_model=UploadRecipientsOut)
+def get_upload_recipients(
+    company_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.upload")),
+):
+    """Usuarios a quienes se puede avisar al subir un documento (con los preseleccionados)."""
+    _check_company_access(db, current_user, company_id)
+    company = _get_company_or_404(db, company_id)
+    if not notice.is_enabled(db, company.organization_id):
+        return UploadRecipientsOut(enabled=False)
+    eligible = notice.eligible_recipients(db, company, current_user.id)
+    defaults = set(notice.default_recipient_ids(db, company, eligible))
+    return UploadRecipientsOut(recipients=[
+        UploadRecipientOut(id=u.id, full_name=u.full_name, email=u.email,
+                           role_name=u.role.name, is_default=u.id in defaults)
+        for u in eligible])
+
+
 @router.post("/upload", response_model=DocumentMatrixItem, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     company_id: int,
     catalog_item_id: int,
+    background_tasks: BackgroundTasks,
     period_label: Optional[str] = None,
+    # Avisos: omitido → supervisores por defecto · "" → no avisar · "3,5" → esos usuarios
+    notify_user_ids: Optional[str] = None,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents.upload")),
@@ -177,6 +201,11 @@ async def upload_document(
 
     doc = crud_doc.upload_document(
         db, company, catalog_item, period_label, file.filename, file_bytes, current_user
+    )
+    notice.notify_after_upload(
+        db, background_tasks, company=company, uploader=current_user, raw_ids=notify_user_ids,
+        document_name=catalog_item.name, period_display=doc.period_label or "Único",
+        company_document_id=doc.id,
     )
 
     matrix = crud_doc.get_document_matrix(db, company, year=_period_year(period_label))

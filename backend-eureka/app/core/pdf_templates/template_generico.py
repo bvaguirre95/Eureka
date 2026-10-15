@@ -112,7 +112,8 @@ table.firmas td.fr {{ color:#555; font-size:7.5pt; }}
 
 # ── Encabezado running ─────────────────────────────────────────────────────────
 
-def _header_html(logo_src, company_name, insp_num, type_name, fecha_hoy):
+def _header_html(logo_src, company_name, insp_num, type_name, fecha_hoy,
+                 version="01", title=None, subtitle=None):
     logo_html = (f'<img src="{logo_src}" class="logo">'
                  if logo_src else f'<span style="font-size:9pt;font-weight:bold">{company_name}</span>')
     return f"""
@@ -122,13 +123,13 @@ def _header_html(logo_src, company_name, insp_num, type_name, fecha_hoy):
       <td rowspan="3" style="width:90px;text-align:center">{logo_html}</td>
       <td rowspan="3" style="text-align:center;font-size:12pt;font-weight:bold;padding:4px 8px">
         {company_name}</td>
-      <td style="width:130px;font-weight:bold;text-align:right;font-size:7.5pt">VERSIÓN: 01</td>
+      <td style="width:130px;font-weight:bold;text-align:right;font-size:7.5pt">VERSIÓN: {version}</td>
     </tr>
     <tr><td style="font-weight:bold;text-align:right;font-size:7.5pt">CÓDIGO: {insp_num}</td></tr>
     <tr><td style="font-weight:bold;text-align:right;font-size:7.5pt">FECHA: {fecha_hoy}</td></tr>
     <tr><td colspan="3" class="hdr-blue">
-      SISTEMA DE GESTIÓN DE SEGURIDAD Y SALUD EN EL TRABAJO</td></tr>
-    <tr><td colspan="3" class="hdr-blue">INSPECCIÓN DE {type_name.upper()}</td></tr>
+      {title or "SISTEMA DE GESTIÓN DE SEGURIDAD Y SALUD EN EL TRABAJO"}</td></tr>
+    <tr><td colspan="3" class="hdr-blue">{subtitle or "INSPECCIÓN DE " + type_name.upper()}</td></tr>
   </table>
 </div>"""
 
@@ -261,19 +262,16 @@ def _actions_section(actions, num):
 </table>"""
 
 
-def _firmas(insp):
+def _firmas(insp, mode="auto"):
+    from app.core.pdf_templates.signatures import resolve_signatories, table_style
+    sg = resolve_signatories(insp, mode)
+    row = lambda cls, fn: "".join(f'<td class="{cls}">{fn(x)}</td>' for x in sg)
     return f"""
-<table class="firmas">
-  <tr><td></td><td></td><td></td></tr>
-  <tr><td class="fl">ELABORADO POR:</td>
-      <td class="fl">REVISADO POR:</td>
-      <td class="fl">APROBADO POR:</td></tr>
-  <tr><td class="fn">{insp.elaborated_by or '___________________'}</td>
-      <td class="fn">{insp.reviewed_by or '___________________'}</td>
-      <td class="fn">{insp.approved_by or '___________________'}</td></tr>
-  <tr><td class="fr">{insp.elaborated_role or ''}</td>
-      <td class="fr">{insp.reviewed_role or ''}</td>
-      <td class="fr">{insp.approved_role or ''}</td></tr>
+<table class="firmas" style="{table_style(len(sg))}">
+  <tr>{row("", lambda x: "")}</tr>
+  <tr>{row("fl", lambda x: x["label"])}</tr>
+  <tr>{row("fn", lambda x: x["name"] or "___________________")}</tr>
+  <tr>{row("fr", lambda x: x["role"] or "")}</tr>
 </table>"""
 
 

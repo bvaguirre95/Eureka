@@ -203,6 +203,10 @@ def create_inspection_type(db: Session, org_id: int, user_id: int,
         structure_type=getattr(type_in, "structure_type", StructureTypeEnum.MATRIZ),
         created_by_id=user_id,
     )
+    if getattr(type_in, "report_format_id", None):
+        from app.crud.inspection_report_format import check_assignable
+        check_assignable(db, type_in.report_format_id, org_id)
+        itype.report_format_id = type_in.report_format_id
     db.add(itype)
     db.flush()
 
@@ -254,6 +258,14 @@ def update_inspection_type(db: Session, itype: InspectionType,
         v = getattr(type_in, f, None)
         if v is not None:
             setattr(itype, f, v)
+
+    # Formato de informe: solo afecta a inspecciones NUEVAS (las existentes conservan el suyo)
+    if getattr(type_in, "clear_report_format", False):
+        itype.report_format_id = None
+    elif getattr(type_in, "report_format_id", None):
+        from app.crud.inspection_report_format import check_assignable
+        check_assignable(db, type_in.report_format_id, itype.organization_id)
+        itype.report_format_id = type_in.report_format_id
 
     if type_in.fields is not None:
         # Verificar si ya existen inspecciones de este tipo
@@ -359,6 +371,7 @@ def create_inspection(db:Session, company_id: int, user_id: int, insp_in) -> "In
         elaborated_by=elaborated_by, elaborated_role=elaborated_role,
         reviewed_by=reviewed_by, reviewed_role=reviewed_role,
         approved_by=approved_by, approved_role=approved_role,
+        report_format_id=itype.report_format_id if itype else None,   # congela la versión
         **data,
     )
     db.add(insp)

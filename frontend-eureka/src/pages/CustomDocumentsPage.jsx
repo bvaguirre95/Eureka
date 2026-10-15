@@ -17,6 +17,7 @@ import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { useAuth } from "../contexts/AuthContext";
 import companyService from "../services/company.service";
+import { askUploadRecipients } from "../components/documents/askUploadRecipients";
 import customDocumentService from "../services/custom_document.service";
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -154,9 +155,14 @@ const FilesModal = ({ open, onClose, companyId, doc, onUpdated, canUpload }) => 
 
   const handleUpload = async (file) => {
     if (!file) return;
+    const notifyUserIds = await askUploadRecipients(companyId);
+    if (notifyUserIds === null) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(true);
     try {
-      await customDocumentService.uploadFile(companyId, doc.id, file, fileType, versionLabel, notes);
+      await customDocumentService.uploadFile(companyId, doc.id, file, fileType, versionLabel, notes, notifyUserIds);
       onUpdated();
       setVersionLabel(""); setNotes("");
       if (fileInputRef.current) fileInputRef.current.value = "";

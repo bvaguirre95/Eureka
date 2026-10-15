@@ -56,6 +56,7 @@ class InspectionTypeCreate(BaseModel):
     is_active:      bool = True
     pdf_template:   str = "generico"
     structure_type: StructureTypeEnum = StructureTypeEnum.MATRIZ   # ← NUEVO
+    report_format_id: Optional[int] = None   # formato de informe (None = pdf_template clásico)
     fields:         List[InspectionTypeFieldCreate] = []
 
 
@@ -68,6 +69,8 @@ class InspectionTypeUpdate(BaseModel):
     is_active:      Optional[bool] = None
     pdf_template:   Optional[str] = None
     structure_type: Optional[StructureTypeEnum] = None             # ← NUEVO
+    report_format_id: Optional[int] = None
+    clear_report_format: bool = False        # True → volver al pdf_template clásico
     fields:         Optional[List[InspectionTypeFieldCreate]] = None
 
 
@@ -82,6 +85,7 @@ class InspectionTypeOut(BaseModel):
     is_active:       bool
     pdf_template:    str = "generico"
     structure_type:  Optional[StructureTypeEnum] = StructureTypeEnum.MATRIZ  # ← NUEVO
+    report_format_id: Optional[int] = None
     fields:          List[InspectionTypeFieldOut] = []
     field_count:     int = 0
     inspection_count: int = 0

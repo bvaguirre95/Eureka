@@ -167,3 +167,41 @@ def build_validation_email(
 </html>"""
 
     return subject, html_body
+
+
+def build_upload_email(
+    *,
+    to_name: str,
+    company_name: str,
+    document_name: str,
+    period_display: str,
+    uploader_name: str,
+) -> tuple[str, str]:
+    """(subject, html) para avisar al supervisor que se cargó un documento pendiente de revisión."""
+    from html import escape as e
+    subject = f"📄 Documento cargado: {document_name} — {company_name}"
+    html_body = f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">
+<tr><td align="center" style="padding:32px 16px;">
+<table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;max-width:100%;">
+  <tr><td style="background:#1f3864;padding:24px 32px;">
+    <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">📄 DOCUMENTO CARGADO</p>
+    <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,.8);">Pendiente de revisión · Eureka SST</p>
+  </td></tr>
+  <tr><td style="padding:28px 32px;">
+    <p style="color:#111827;font-size:15px;margin:0 0 12px;">Hola <strong>{e(to_name)}</strong>,</p>
+    <p style="color:#374151;font-size:14px;margin:0 0 16px;">
+      <strong>{e(uploader_name)}</strong> cargó un documento que está pendiente de tu revisión.
+    </p>
+    <table width="100%" cellpadding="8" cellspacing="0" style="font-size:13px;border:1px solid #e5e7eb;border-radius:8px;">
+      <tr><td style="color:#6b7280;width:120px;">Empresa</td><td><strong>{e(company_name)}</strong></td></tr>
+      <tr><td style="color:#6b7280;">Documento</td><td><strong>{e(document_name)}</strong></td></tr>
+      <tr><td style="color:#6b7280;">Período</td><td>{e(period_display)}</td></tr>
+      <tr><td style="color:#6b7280;">Cargado por</td><td>{e(uploader_name)}</td></tr>
+    </table>
+    <p style="color:#6b7280;font-size:12px;margin:20px 0 0;">Ingresa a Eureka SST para revisarlo. Puedes responder este correo para escribir directamente a quien lo cargó.</p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+    return subject, html_body

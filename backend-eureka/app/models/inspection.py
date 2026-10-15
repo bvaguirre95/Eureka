@@ -94,12 +94,18 @@ class InspectionType(Base):
         default=StructureTypeEnum.MATRIZ,   # default = comportamiento actual
     )
 
+    # Formato de informe vigente para NUEVAS inspecciones de este tipo.
+    # NULL → comportamiento anterior (pdf_template). Ver inspection_report_format.py
+    report_format_id = Column(Integer, ForeignKey("inspection_report_formats.id",
+                               ondelete="SET NULL"), nullable=True)
+
     created_by_id   = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     updated_at      = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     organization = relationship("Organization")
     created_by   = relationship("User")
+    report_format = relationship("InspectionReportFormat", foreign_keys=[report_format_id])
     fields       = relationship(
         "InspectionTypeField", back_populates="inspection_type",
         cascade="all, delete-orphan", order_by="InspectionTypeField.order"
@@ -169,10 +175,17 @@ class Inspection(Base):
     # Estructura: { field_key: value, ... }
     general_data = Column(JSON, nullable=True, default=dict)
 
+    # Versión exacta del formato con la que se emite el documento. Se fija al
+    # crear la inspección → editar el formato después NO altera documentos históricos.
+    # NULL (inspecciones previas) → se usa InspectionType.pdf_template como antes.
+    report_format_id = Column(Integer, ForeignKey("inspection_report_formats.id",
+                               ondelete="SET NULL"), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     company         = relationship("Company")
+    report_format   = relationship("InspectionReportFormat", foreign_keys=[report_format_id])
     inspection_type = relationship("InspectionType", back_populates="inspections")
     assigned_to     = relationship("User", foreign_keys=[assigned_to_id])
     created_by      = relationship("User", foreign_keys=[created_by_id])

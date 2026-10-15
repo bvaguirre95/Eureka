@@ -9,6 +9,7 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import documentService from "../../services/document.service";
+import { askUploadRecipients } from "./askUploadRecipients";
 import { STATUS_CONFIG } from "./documentStatus";
 import { DocumentPreviewModal } from "./DocumentPreviewModal";
 
@@ -75,12 +76,20 @@ export const PeriodDetailModal = ({ open, onClose, row, companyId, canUpload, ca
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Check de a quién avisar (supervisor). null = canceló → no se sube.
+    const notifyUserIds = await askUploadRecipients(companyId);
+    if (notifyUserIds === null) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setUploading(true);
     try {
       const updated = await documentService.uploadDocument(companyId, {
         catalogItemId: row.catalog_item_id,
         periodLabel: row.period_label,
         file,
+        notifyUserIds,
       });
       onChanged(updated);
     } catch (err) {

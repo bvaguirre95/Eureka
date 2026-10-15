@@ -18,6 +18,7 @@ import { DiagnosticListPage }  from "./pages/DiagnosticListPage";
 import { DiagnosticFormPage }  from "./pages/DiagnosticFormPage";
 import InspectionTypesPage     from "./pages/InspectionTypesPage";
 import InspectionTemplatesPage  from "./pages/InspectionTemplatesPage";
+import ReportFormatsPage        from "./pages/ReportFormatsPage";
 import InspectionListPage      from "./pages/InspectionListPage";
 import { InspectionFormPage }  from "./pages/InspectionFormPage";
 import { InspectionDashboardPage } from "./pages/InspectionDashboardPage";
@@ -75,6 +76,8 @@ function App() {
           {/* ── Inspecciones ─────────────────────────────────────────────── */}
           <Route path="/dashboard/tipos-inspeccion"
             element={<PR perms={["inspections.view","inspections.manage"]}><InspectionTypesPage /></PR>} />
+          <Route path="/dashboard/formatos-informe"
+            element={<PR perms={["inspections.view","inspections.manage"]}><ReportFormatsPage /></PR>} />
           <Route path="/dashboard/plantillas-inspeccion"
             element={<PR perms={["inspections.view"]}><InspectionTemplatesPage /></PR>} />
           <Route path="/dashboard/empresas/:companyId/inspecciones/dashboard"

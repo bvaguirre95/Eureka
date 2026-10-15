@@ -10,6 +10,20 @@ const createType     = (orgId, payload) => api.post(orgPrefix(orgId), payload).t
 const updateType     = (orgId, id, p)   => api.put(`${orgPrefix(orgId)}/${id}`, p).then(r => r.data);
 const deactivateType = (orgId, id)      => api.delete(`${orgPrefix(orgId)}/${id}`).then(r => r.data);
 const getTemplates   = ()               => api.get("/api/v1/pdf-templates").then(r => r.data);
+// Formatos de informe (secciones + diseño, versionados). Incluye los genéricos globales.
+const getReportFormats = (orgId, allVersions = false) =>
+  api.get(`/api/v1/organizations/${orgId}/report-formats`, { params: { all_versions: allVersions } }).then(r => r.data);
+const getReportFormatCatalog = () => api.get("/api/v1/report-formats/catalog").then(r => r.data);
+const createReportFormat = (orgId, data) =>
+  api.post(`/api/v1/organizations/${orgId}/report-formats`, data).then(r => r.data);
+const updateReportFormat = (orgId, id, data) =>
+  api.put(`/api/v1/organizations/${orgId}/report-formats/${id}`, data).then(r => r.data);
+// Inspecciones reales para probar un formato, y PDF de vista previa con el borrador (sin guardar)
+const getPreviewInspections = (orgId, typeId) =>
+  api.get(`/api/v1/organizations/${orgId}/report-formats/preview-inspections`,
+    { params: typeId ? { inspection_type_id: typeId } : {} }).then(r => r.data);
+const previewReportFormat = (orgId, data) =>
+  api.post(`/api/v1/organizations/${orgId}/report-formats/preview`, data, { responseType: "blob" }).then(r => r.data);
 
 // ── Inspecciones ──────────────────────────────────────────────────────────────
 const list   = (cId)          => api.get(`${cmpPrefix(cId)}/`).then(r => r.data);
@@ -90,7 +104,8 @@ const confirmExcelImport = (payload) =>
   api.post("/api/v1/inspection-templates/import-excel/confirm", payload).then(r => r.data);
 
 const inspectionService = {
-  getTypes, createType, updateType, deactivateType, getTemplates,
+  getTypes, createType, updateType, deactivateType, getTemplates, getReportFormats, getReportFormatCatalog,
+  createReportFormat, updateReportFormat, getPreviewInspections, previewReportFormat,
   getInspectionTemplates, getInspectionTemplate,
   createInspectionTemplate, updateInspectionTemplate, deleteInspectionTemplate,
   copyInspectionTemplate, useInspectionTemplate, createGlobalTemplate,

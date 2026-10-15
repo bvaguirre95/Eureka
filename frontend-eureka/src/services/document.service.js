@@ -23,17 +23,25 @@ const getSummary = async (companyId, year) => {
   return response.data;
 };
 
-const uploadDocument = async (companyId, { catalogItemId, periodLabel, file }) => {
+const uploadDocument = async (companyId, { catalogItemId, periodLabel, file, notifyUserIds }) => {
   const formData = new FormData();
   formData.append("file", file);
 
   const params = { catalog_item_id: catalogItemId };
   if (periodLabel) params.period_label = periodLabel;
+  // undefined → supervisores por defecto · [] → no avisar · [ids] → esos usuarios
+  if (notifyUserIds !== undefined) params.notify_user_ids = notifyUserIds.join(",");
 
   const response = await api.post(`${companyDocsPrefix(companyId)}/upload`, formData, {
     params,
     headers: { "Content-Type": "multipart/form-data" },
   });
+  return response.data;
+};
+
+// A quién se puede avisar al subir un documento (con los preseleccionados)
+const getUploadRecipients = async (companyId) => {
+  const response = await api.get(`${companyDocsPrefix(companyId)}/upload-recipients`);
   return response.data;
 };
 
@@ -151,6 +159,7 @@ const documentService = {
   getMatrix,
   getSummary,
   uploadDocument,
+  getUploadRecipients,
   validateDocument,
   resendValidationEmail,
   getDownloadUrl,

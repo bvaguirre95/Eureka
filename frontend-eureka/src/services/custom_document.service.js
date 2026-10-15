@@ -17,12 +17,13 @@ const update = (cId, docId, payload) =>
 const remove = (cId, docId) =>
   api.delete(`${base(cId)}/${docId}`);
 
-const uploadFile = (cId, docId, file, fileType = "principal", versionLabel = "", notes = "") => {
+const uploadFile = (cId, docId, file, fileType = "principal", versionLabel = "", notes = "", notifyUserIds) => {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("file_type", fileType);
   if (versionLabel) fd.append("version_label", versionLabel);
   if (notes)        fd.append("notes", notes);
+  if (notifyUserIds !== undefined) fd.append("notify_user_ids", notifyUserIds.join(","));
   return api.post(`${base(cId)}/${docId}/files`, fd, {
     headers: { "Content-Type": "multipart/form-data" },
   }).then(r => r.data);
